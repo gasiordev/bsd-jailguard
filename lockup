@@ -31,19 +31,14 @@ def create_parser():
     
     # 'create' sub-command.
     parser_create = subparsers.add_parser('create', help='creates jail')
-    parser_create.add_argument('hostname')
-    parser_create.add_argument('ip_address')
-    parser_create.add_argument('name')
+    for arg in ['hostname', 'ip_address', 'name']:
+        parser_create.add_argument(arg)
     parser_create.add_argument('release', choices=['11.0-RELEASE'])
     parser_create.add_argument('--allow-raw-sockets', action='store_const', const=1, help='allow raw sockets')
-    parser_create.add_argument('--ports', action='store_const', const=1, help='add ports')
-    parser_create.add_argument('--src', action='store_const', const=1, help='add src')
-    parser_create.add_argument('--lib32', action='store_const', const=1, help='add lib32')
-    parser_create.add_argument('--kernel', action='store_const', const=1, help='add kernel')
-    parser_create.add_argument('--doc', action='store_const', const=1, help='add doc')
-    parser_create.add_argument('--tests', action='store_const', const=1, help='add tests')
-    parser_create.add_argument('--service-nginx', action='store_const', const=1, help='start nginx service')
-    parser_create.add_argument('--service-sshd', action='store_const', const=1, help='start sshd service')
+    for part in ['ports', 'src', 'lib32', 'kernel', 'doc', 'tests']:
+        parser_create.add_argument('--'+part, action='store_const', const=1, help='add '+part)
+    for service in ['nginx', 'sshd']:
+        parser_create.add_argument('--service-'+service, action='store_const', const=1, help='start '+service+' service')
     parser_create.set_defaults(cmd='create')
     
     # 'remove' sub-command.
