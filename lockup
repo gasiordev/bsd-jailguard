@@ -45,7 +45,9 @@ def validate_name(string):
 
 def create_parser():
     # Creating args parser.
-    parser = argparse.ArgumentParser(description="Simple jail management tool", epilog="Visit http://github.com/xnicholas/lockup for more information.")
+    parser = argparse.ArgumentParser(
+        description="Simple jail management tool", 
+        epilog="Visit http://github.com/xnicholas/lockup for more information.")
     
     subparsers = parser.add_subparsers(help='action to be taken')
     
