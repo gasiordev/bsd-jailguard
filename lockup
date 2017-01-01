@@ -9,7 +9,12 @@
 # * service ssh;
 # * service nginx.
 
-import argparse
+from subprocess import Popen, PIPE
+import argparse, binascii, re
+from sys import stdout
+
+path_jails='/usr/local/jails/'
+format_list="{: <3} {: <20} {: <15} {: <30}"
 
 parser = argparse.ArgumentParser(description="Simple jail management tool", epilog="Visit http://github.com/xnicholas/lockup for more information.")
 
@@ -32,3 +37,29 @@ parser_list = subparsers.add_parser('list', help='lists all jails')
 parser_list.set_defaults(cmd='list')
 
 args = vars(parser.parse_args())
+
+if 'cmd' in args:
+    if args['cmd'] == 'create':
+        print('create')
+
+    elif args['cmd'] == 'remove':
+        print('remove')
+
+    elif args['cmd'] == 'list':
+        # Using 'jls' command to get the currently running jails.
+        p = Popen(['jls'], stdout=PIPE, stderr=PIPE)
+        out, err = p.communicate()
+        print(format_list.format("ID", "Name", "IP", "Hostname"))
+        for line in out.decode('utf-8').split('\n'):
+            line = re.sub('^[ ]+', '', line)
+            line = re.sub('[ ]{2,}', ' ', line)
+            if re.match('^[0-9]+', line):
+                line_arr = line.split(' ')
+                jail_id = line_arr[0]
+                jail_ip = line_arr[1]
+                jail_hostname = line_arr[2]
+                # Assuming that path contains name of the jail.
+                jail_path = re.sub(r'\/$', '', line_arr[3])
+                jail_name = re.search(r'\/[a-zA-Z0-9\-_\.]+$', jail_path).group(0)
+                jail_name = re.sub(r'^\/', '', jail_name)
+                print(format_list.format(jail_id, jail_name, jail_ip, jail_hostname))
