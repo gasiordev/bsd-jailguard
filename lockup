@@ -22,11 +22,13 @@ parser_create.add_argument('name')
 parser_create.add_argument('-ars', '--allow-raw-sockets', action='store_const', const=1, help='allow raw sockets')
 parser_create.add_argument('-sn', '--service-nginx', action='store_const', const=1, help='start nginx service')
 parser_create.add_argument('-ss', '--service-sshd', action='store_const', const=1, help='start sshd service')
+parser_create.set_defaults(cmd='create')
 
 parser_remove = subparsers.add_parser('remove', help='removes jail')
 parser_remove.add_argument('name')
+parser_remove.set_defaults(cmd='remove')
 
 parser_list = subparsers.add_parser('list', help='lists all jails')
+parser_list.set_defaults(cmd='list')
 
-parser.parse_args()
-
+args = vars(parser.parse_args())
