@@ -21,57 +21,71 @@ from sys import stdout
 path_jails='/usr/local/jails/'
 format_list="{: <3} {: <20} {: <15} {: <30}"
 
-# Creating args parser.
-parser = argparse.ArgumentParser(description="Simple jail management tool", epilog="Visit http://github.com/xnicholas/lockup for more information.")
+def create_parser():
+    # Creating args parser.
+    parser = argparse.ArgumentParser(description="Simple jail management tool", epilog="Visit http://github.com/xnicholas/lockup for more information.")
+    
+    subparsers = parser.add_subparsers(help='action to be taken')
+    
+    # 'create' sub-command.
+    parser_create = subparsers.add_parser('create', help='creates jail')
+    parser_create.add_argument('hostname')
+    parser_create.add_argument('ip_address')
+    parser_create.add_argument('name')
+    parser_create.add_argument('-ars', '--allow-raw-sockets', action='store_const', const=1, help='allow raw sockets')
+    parser_create.add_argument('-sn', '--service-nginx', action='store_const', const=1, help='start nginx service')
+    parser_create.add_argument('-ss', '--service-sshd', action='store_const', const=1, help='start sshd service')
+    parser_create.set_defaults(cmd='create')
+    
+    # 'remove' sub-command.
+    parser_remove = subparsers.add_parser('remove', help='removes jail')
+    parser_remove.add_argument('name')
+    parser_remove.set_defaults(cmd='remove')
+    
+    # 'list' sub-command.
+    parser_list = subparsers.add_parser('list', help='lists all jails')
+    parser_list.set_defaults(cmd='list')
+    
+    return parser
 
-subparsers = parser.add_subparsers(help='action to be taken')
+def parse_args(parser):
+    # Parsing the arguments.
+    args = vars(parser.parse_args())
 
-# 'create' sub-command.
-parser_create = subparsers.add_parser('create', help='creates jail')
-parser_create.add_argument('hostname')
-parser_create.add_argument('ip_address')
-parser_create.add_argument('name')
-parser_create.add_argument('-ars', '--allow-raw-sockets', action='store_const', const=1, help='allow raw sockets')
-parser_create.add_argument('-sn', '--service-nginx', action='store_const', const=1, help='start nginx service')
-parser_create.add_argument('-ss', '--service-sshd', action='store_const', const=1, help='start sshd service')
-parser_create.set_defaults(cmd='create')
+    # Main sub-command switch.
+    if 'cmd' in args:
+        if args['cmd'] == 'create':
+            print('create')
+    
+        elif args['cmd'] == 'remove':
+            print('remove')
+    
+        elif args['cmd'] == 'list':
+            list_jails()
 
-# 'remove' sub-command.
-parser_remove = subparsers.add_parser('remove', help='removes jail')
-parser_remove.add_argument('name')
-parser_remove.set_defaults(cmd='remove')
+def list_jails():
+    # Using 'jls' command to get the currently running jails.
+    p = Popen(['jls'], stdout=PIPE, stderr=PIPE)
+    out, err = p.communicate()
+    print(format_list.format("ID", "Name", "IP", "Hostname"))
+    for line in out.decode('utf-8').split('\n'):
+        line = re.sub('^[ ]+', '', line)
+        line = re.sub('[ ]{2,}', ' ', line)
+        if re.match('^[0-9]+', line):
+            line_arr = line.split(' ')
+            jail_id = line_arr[0]
+            jail_ip = line_arr[1]
+            jail_hostname = line_arr[2]
+            # Assuming that path contains name of the jail.
+            jail_path = re.sub(r'\/$', '', line_arr[3])
+            jail_name = re.search(r'\/[a-zA-Z0-9\-_\.]+$', jail_path).group(0)
+            jail_name = re.sub(r'^\/', '', jail_name)
+            print(format_list.format(jail_id, jail_name, jail_ip, jail_hostname))
 
-# 'list' sub-command.
-parser_list = subparsers.add_parser('list', help='lists all jails')
-parser_list.set_defaults(cmd='list')
+def main():
+    parser = create_parser()
+    parse_args(parser)
 
-# Parsing the arguments.
-args = vars(parser.parse_args())
+if __name__ == "__main__":
+    main()
 
-
-# Main sub-command switch.
-if 'cmd' in args:
-    if args['cmd'] == 'create':
-        print('create')
-
-    elif args['cmd'] == 'remove':
-        print('remove')
-
-    elif args['cmd'] == 'list':
-        # Using 'jls' command to get the currently running jails.
-        p = Popen(['jls'], stdout=PIPE, stderr=PIPE)
-        out, err = p.communicate()
-        print(format_list.format("ID", "Name", "IP", "Hostname"))
-        for line in out.decode('utf-8').split('\n'):
-            line = re.sub('^[ ]+', '', line)
-            line = re.sub('[ ]{2,}', ' ', line)
-            if re.match('^[0-9]+', line):
-                line_arr = line.split(' ')
-                jail_id = line_arr[0]
-                jail_ip = line_arr[1]
-                jail_hostname = line_arr[2]
-                # Assuming that path contains name of the jail.
-                jail_path = re.sub(r'\/$', '', line_arr[3])
-                jail_name = re.search(r'\/[a-zA-Z0-9\-_\.]+$', jail_path).group(0)
-                jail_name = re.sub(r'^\/', '', jail_name)
-                print(format_list.format(jail_id, jail_name, jail_ip, jail_hostname))
