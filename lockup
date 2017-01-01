@@ -16,6 +16,7 @@ from sys import stdout
 path_jails='/usr/local/jails/'
 format_list="{: <3} {: <20} {: <15} {: <30}"
 
+# Handling args.
 parser = argparse.ArgumentParser(description="Simple jail management tool", epilog="Visit http://github.com/xnicholas/lockup for more information.")
 
 subparsers = parser.add_subparsers(help='action to be taken')
@@ -38,6 +39,7 @@ parser_list.set_defaults(cmd='list')
 
 args = vars(parser.parse_args())
 
+# Main sub-command switch.
 if 'cmd' in args:
     if args['cmd'] == 'create':
         print('create')
