@@ -6,7 +6,8 @@
 # Quick script to create, remove and list jails.
 #
 # Arguments to deal with:
-# * parts to be installed: base, src, ports, lib32;
+# * parts to be installed: base, src, ports, lib32, kernel, doc, tests;
+# * version;
 # * jail IP address;
 # * jail name;
 # * jail hostname;
@@ -18,6 +19,7 @@ from subprocess import Popen, PIPE
 import argparse, binascii, re
 from sys import stdout
 
+# @todo Base to be added as an optional argument later.
 path_jails='/usr/local/jails/'
 format_list="{: <3} {: <20} {: <15} {: <30}"
 
@@ -32,9 +34,16 @@ def create_parser():
     parser_create.add_argument('hostname')
     parser_create.add_argument('ip_address')
     parser_create.add_argument('name')
-    parser_create.add_argument('-ars', '--allow-raw-sockets', action='store_const', const=1, help='allow raw sockets')
-    parser_create.add_argument('-sn', '--service-nginx', action='store_const', const=1, help='start nginx service')
-    parser_create.add_argument('-ss', '--service-sshd', action='store_const', const=1, help='start sshd service')
+    parser_create.add_argument('release', choices=['11.0-RELEASE'])
+    parser_create.add_argument('--allow-raw-sockets', action='store_const', const=1, help='allow raw sockets')
+    parser_create.add_argument('--ports', action='store_const', const=1, help='add ports')
+    parser_create.add_argument('--src', action='store_const', const=1, help='add src')
+    parser_create.add_argument('--lib32', action='store_const', const=1, help='add lib32')
+    parser_create.add_argument('--kernel', action='store_const', const=1, help='add kernel')
+    parser_create.add_argument('--doc', action='store_const', const=1, help='add doc')
+    parser_create.add_argument('--tests', action='store_const', const=1, help='add tests')
+    parser_create.add_argument('--service-nginx', action='store_const', const=1, help='start nginx service')
+    parser_create.add_argument('--service-sshd', action='store_const', const=1, help='start sshd service')
     parser_create.set_defaults(cmd='create')
     
     # 'remove' sub-command.
@@ -55,13 +64,19 @@ def parse_args(parser):
     # Main sub-command switch.
     if 'cmd' in args:
         if args['cmd'] == 'create':
-            print('create')
+            create_jail(args)
     
         elif args['cmd'] == 'remove':
-            print('remove')
+            remove_jail(args)
     
         elif args['cmd'] == 'list':
             list_jails()
+
+def create_jail(args):
+    print(args)
+
+def remove_jail(args):
+    print(args)
 
 def list_jails():
     # Using 'jls' command to get the currently running jails.
