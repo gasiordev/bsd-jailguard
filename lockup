@@ -20,8 +20,8 @@ import argparse, binascii, re, os, sys
 from sys import stdout
 
 # @todo Base to be added as an optional argument later.
-path_jails='/usr/local/jails2/'
-zroot_jails='zroot/jails2'
+path_jails='/usr/local/jails/'
+zroot_jails='zroot/jails'
 format_list="{: <3} {: <20} {: <15} {: <30}"
 
 def validate_hostname(string):
