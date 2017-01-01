@@ -16,12 +16,32 @@
 # * service nginx.
 
 from subprocess import Popen, PIPE
-import argparse, binascii, re
+import argparse, binascii, re, os, sys
 from sys import stdout
 
 # @todo Base to be added as an optional argument later.
-path_jails='/usr/local/jails/'
+path_jails='/usr/local/jails2/'
+zroot_jails='zroot/jails2'
 format_list="{: <3} {: <20} {: <15} {: <30}"
+
+def validate_hostname(string):
+    # @todo Better validation needed here.
+    if not re.match(r'^[a-z0-9][a-zA-Z0-9\.\-]+[a-z0-9]$', string):
+        raise argparse.ArgumentTypeError('')
+    return string
+
+def validate_ip_address(string):
+    if not re.match(r'^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$', string):
+        raise argparse.ArgumentTypeError('')
+    for x in string.split('.'):
+        if int(x)>255:
+            raise argparse.ArgumentTypeError('')
+    return string
+
+def validate_name(string):
+    if not re.match(r'^[a-z0-9\-_]+$', string):
+        raise argparse.ArgumentTypeError('')
+    return string
 
 def create_parser():
     # Creating args parser.
@@ -31,8 +51,9 @@ def create_parser():
     
     # 'create' sub-command.
     parser_create = subparsers.add_parser('create', help='creates jail')
-    for arg in ['hostname', 'ip_address', 'name']:
-        parser_create.add_argument(arg)
+    parser_create.add_argument('hostname', type=validate_hostname)
+    parser_create.add_argument('ip_address', type=validate_ip_address)
+    parser_create.add_argument('name', type=validate_name)
     parser_create.add_argument('release', choices=['11.0-RELEASE'])
     parser_create.add_argument('--allow-raw-sockets', action='store_const', const=1, help='allow raw sockets')
     for part in ['ports', 'src', 'lib32', 'kernel', 'doc', 'tests']:
@@ -68,7 +89,12 @@ def parse_args(parser):
             list_jails()
 
 def create_jail(args):
-    print(args)
+    if not os.path.isdir(path_jails):
+        sys.stderr.write("\n*** Path "+path_jails+" needs to be a directory. ***\n\n" \
+        + "If you use zfs you can create a pool by running the following command:\n" \
+        + "zfs create -o mountpoint="+path_jails+" "+zroot_jails+"\n\n")
+        sys.exit(1)
+
 
 def remove_jail(args):
     print(args)
