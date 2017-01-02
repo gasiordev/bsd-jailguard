@@ -11,13 +11,13 @@
 # * jail IP address;
 # * jail name;
 # * jail hostname;
-# * internet inside;
-# * service ssh;
-# * service nginx.
+# * allow raw sockets.
 
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, run
 import argparse, binascii, re, os, sys, urllib.request, shutil
 from sys import stdout
+
+VERSION=0.1
 
 # @todo Base to be added as an optional argument later.
 path_jails='/usr/local/jails'
@@ -49,6 +49,9 @@ def validate_name(string):
         raise argparse.ArgumentTypeError('')
     return string
 
+def validate_nat_pass(interface, ip_address):
+    return string
+
 def create_parser():
     # Create args parser.
     parser = argparse.ArgumentParser(
@@ -67,8 +70,8 @@ def create_parser():
     parser_create.add_argument('--allow-raw-sockets', action='store_const', const=1, help='allow raw sockets')
     for part in ['ports', 'src', 'lib32', 'kernel', 'doc', 'tests']:
         parser_create.add_argument('--'+part, action='store_const', const=1, help='add '+part)
-    for service in ['nginx', 'sshd']:
-        parser_create.add_argument('--service-'+service, action='store_const', const=1, help='start '+service+' service')
+    #for service in ['nginx', 'sshd']:
+    #    parser_create.add_argument('--service-'+service, action='store_const', const=1, help='start '+service+' service')
     parser_create.set_defaults(cmd='create')
     
     # 'remove' sub-command.
@@ -164,11 +167,11 @@ def create_jail(args):
 
     # Download FreeBSD and insert into jail directory.
     urllib.request.urlretrieve(url_freebsd+'/'+args['release']+'/base.txz', path_jail+'/base.txz')
-    Popen(['tar', '-xvf', path_jail+'/base.txz', '-C', path_jail+'/'], stdout=PIPE, stderr=PIPE)
+    run(['tar', '-xvf', path_jail+'/base.txz', '-C', path_jail+'/'], stdout=PIPE, stderr=PIPE)
     for part in ['src', 'ports', 'kernel', 'lib32', 'doc', 'tests']:
         if args[part] is not None:
             urllib.request.urlretrieve(url_freebsd+'/'+args['release']+'/'+part+'.txz', path_jail+'/'+part+'.txz')
-            Popen(['tar', '-xvf', path_jail+'/'+part+'.txz', '-C', path_jail+'/'], stdout=PIPE, stderr=PIPE)
+            run(['tar', '-xvf', path_jail+'/'+part+'.txz', '-C', path_jail+'/'], stdout=PIPE, stderr=PIPE)
 
     # Copy resolv, localtime and add hostname to jail.
     shutil.copy('/etc/resolv.conf', path_jail+'/etc/resolv.conf')
@@ -176,8 +179,21 @@ def create_jail(args):
     with open(path_jail+'/etc/rc.conf', 'a') as file:
         file.writelines("hostname=\""+args['hostname']+"\"\n")
 
-    # Adding information to jail.conf.
+    # Add information to jail.conf.
     alter_jail_conf(args['name'], args['hostname'], path_jail, args['interface'], args['ip_address'], args['allow_raw_sockets'])
+
+    # Print useful info on nat pass in pf.
+    if args['allow_raw_sockets'] is not None and args['allow_raw_sockets'] == 1:
+        sys.stdout.write("If you'd like to have internet inside your jail, add nat pass to your pf.\n" \
+        + "See below example:\n"
+        + "nat pass on YOUR_INTERNET_IFACE from "+args['ip_address']+" to any -> YOUR_GATEWAY\n\n")
+
+    # Start jail.
+    run(['jail', '-c', args['name']], stdout=PIPE, stderr=PIPE)
+
+    # Print out message + list jails.
+    sys.stdout.write("Your jail "+args['name']+" should be now running.\n\n")
+    list_jails()
 
 def remove_jail(args):
     print(args)
