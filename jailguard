@@ -127,7 +127,7 @@ def check_interface_and_ip_address(interface, ip):
         + "ifconfig lo1 alias 10.0.0.12\n\n")
         sys.exit(1)
 
-def alter_jail_conf(name, hostname, path, interface, ip_address):
+def alter_jail_conf(name, hostname, path, interface, ip_address, allow_raw_sockets):
     # Add base configuration to jail.conf; only if the file does not exist.
     # If file exists then we'll assume that the base configuration is already there.
     if not os.path.isfile('/etc/jail.conf'):
@@ -144,6 +144,7 @@ def alter_jail_conf(name, hostname, path, interface, ip_address):
         + "    path = \""+path+"\";\n"
         + "    interface = \""+interface+"\";\n"
         + "    ip4.addr = \""+ip_address+"\";\n"
+        + ("    allow.raw_sockets = 1;\n" if allow_raw_sockets is not None and allow_raw_sockets == 1 else "")
         + "}\n")
 
 # @todo Add handling errors and exceptions.
@@ -176,9 +177,7 @@ def create_jail(args):
         file.writelines("hostname=\""+args['hostname']+"\"\n")
 
     # Adding information to jail.conf.
-    alter_jail_conf(args['name'], args['hostname'], path_jail, args['interface'], args['ip_address'])
-
-    
+    alter_jail_conf(args['name'], args['hostname'], path_jail, args['interface'], args['ip_address'], args['allow_raw_sockets'])
 
 def remove_jail(args):
     print(args)
