@@ -49,9 +49,6 @@ def validate_name(string):
         raise argparse.ArgumentTypeError('')
     return string
 
-def validate_nat_pass(interface, ip_address):
-    return string
-
 def create_parser():
     # Create args parser.
     parser = argparse.ArgumentParser(
@@ -70,8 +67,6 @@ def create_parser():
     parser_create.add_argument('--allow-raw-sockets', action='store_const', const=1, help='allow raw sockets')
     for part in ['ports', 'src', 'lib32', 'kernel', 'doc', 'tests']:
         parser_create.add_argument('--'+part, action='store_const', const=1, help='add '+part)
-    #for service in ['nginx', 'sshd']:
-    #    parser_create.add_argument('--service-'+service, action='store_const', const=1, help='start '+service+' service')
     parser_create.set_defaults(cmd='create')
     
     # 'remove' sub-command.
@@ -99,6 +94,37 @@ def parse_args(parser):
     
         elif args['cmd'] == 'list':
             list_jails()
+
+def get_jail_config(name):
+    if not os.path.isfile('/etc/jail.conf'):
+        return None
+    with open('/etc/jail.conf') as file:
+        details = {}
+        found = False
+        for line in file:
+            line = re.sub(r'(^[\s]+)|([\s]+$)', '', line)
+            if not found:
+                name_match =re.match(r'^(\w+)[\s]+{', line)
+                if name_match is not None:
+                    jail_name = name_match.group(1)
+                    if jail_name == name:
+                        found = True
+            else:
+                if re.match(r'^}', line):
+                    break;
+                break_after_this = False
+                if re.match(r'}$', line):
+                    break_after_this = True
+                    line = re.sub(r'[\s]*}$', '', line)
+                line = re.sub(r'["]*;$', '', line)
+                line = re.sub(r'[\s]*=[\s]*["]{0,1}', '=', line)
+                (key, val) = line.split('=')
+                details[key] = val
+                if break_after_this:
+                    break
+        if found:
+            return details
+    return None
 
 def check_path_jails_exists(path_jails):
     if not os.path.isdir(path_jails):
@@ -152,6 +178,12 @@ def alter_jail_conf(name, hostname, path, interface, ip_address, allow_raw_socke
 
 # @todo Add handling errors and exceptions.
 def create_jail(args):
+    # Check if jail does not exist already.
+    jail_config = get_jail_config(args['name'])
+    if jail_config is not None:
+        sys.stderr.write("\n*** Jail "+args['name']+" already exists in /etc/jail.conf.\n\n")
+        sys.exit(1)
+
     # Check if jails directory exists.
     check_path_jails_exists(path_jails)
 
@@ -159,7 +191,7 @@ def create_jail(args):
     path_jail = path_jails+'/'+args['name']
     check_jail_dir_doesnt_exist(path_jail)
 
-    # Check if IP address is assigned to any of the interfaces.
+    # Check if IP address is assigned to the interfaces.
     check_interface_and_ip_address(args['interface'], args['ip_address'])
 
     # Create jail directory.
@@ -188,12 +220,7 @@ def create_jail(args):
         + "See below example:\n"
         + "nat pass on YOUR_INTERNET_IFACE from "+args['ip_address']+" to any -> YOUR_GATEWAY\n\n")
 
-    # Start jail.
-    run(['jail', '-c', args['name']], stdout=PIPE, stderr=PIPE)
-
-    # Print out message + list jails.
-    sys.stdout.write("Your jail "+args['name']+" should be now running.\n\n")
-    list_jails()
+    sys.stdout.write("Your jail "+args['name']+" should be now created.\n\n")
 
 def remove_jail(args):
     print(args)
