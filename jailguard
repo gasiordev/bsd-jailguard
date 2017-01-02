@@ -72,6 +72,8 @@ def create_parser():
     # 'remove' sub-command.
     parser_remove = subparsers.add_parser('remove', help='removes jail')
     parser_remove.add_argument('name')
+    parser_remove.add_argument('--comment-out-config', action='store_const', const=1, help='comments out config instead of removing')
+    parser_remove.add_argument('--remove-files', action='store_const', const=1, help='removes jail directory')
     parser_remove.set_defaults(cmd='remove')
     
     # 'list' sub-command.
@@ -223,7 +225,20 @@ def create_jail(args):
     sys.stdout.write("Your jail "+args['name']+" should be now created.\n\n")
 
 def remove_jail(args):
-    print(args)
+    # Check if jail exists.
+    jail_config = get_jail_config(args['name'])
+    if jail_config is None:
+        sys.stderr.write("\n*** Jail "+args['name']+" does not exist in /etc/jail.conf.\n\n")
+        sys.exit(1)
+
+    path_jail = path_jails+'/'+args['name']
+    #remove_jail_config(args['name'], args['comment_out_config'])
+
+    if args['remove_files'] is not None and args['remove_files'] == 1:
+        run(['chflags', '-R', 'noschg', path_jail], stdout=PIPE, stderr=PIPE)
+        shutil.rmtree(path_jail)
+
+    sys.stdout.write("Your jail "+args['name']+" should be now removed.\n\n")
 
 def list_jails():
     # Use 'jls' command to get the currently running jails.
