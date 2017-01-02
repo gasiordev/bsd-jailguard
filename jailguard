@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 
-# Lockup by Nicholas Gasior <nicholas@laatu.uk>
-# http://github.com/xnicholas/lockup
+# jailguard by Nicholas Gasior <nicholas@laatu.uk>
+# http://github.com/xnicholas/jailguard
 #
 # Quick script to create, remove and list jails.
 #
@@ -16,13 +16,14 @@
 # * service nginx.
 
 from subprocess import Popen, PIPE
-import argparse, binascii, re, os, sys
+import argparse, binascii, re, os, sys, urllib.request, shutil
 from sys import stdout
 
 # @todo Base to be added as an optional argument later.
-path_jails='/usr/local/jails/'
+path_jails='/usr/local/jails'
 zroot_jails='zroot/jails'
 format_list="{: <3} {: <20} {: <15} {: <30}"
+url_freebsd='ftp://ftp.freebsd.org/pub/FreeBSD/releases/amd64'
 
 def validate_hostname(string):
     # @todo Better validation needed here.
@@ -38,13 +39,18 @@ def validate_ip_address(string):
             raise argparse.ArgumentTypeError('')
     return string
 
+def validate_interface(string):
+    if not re.match(r'^[a-z0-9\-_]+$', string):
+        raise argparse.ArgumentTypeError('')
+    return string
+
 def validate_name(string):
     if not re.match(r'^[a-z0-9\-_]+$', string):
         raise argparse.ArgumentTypeError('')
     return string
 
 def create_parser():
-    # Creating args parser.
+    # Create args parser.
     parser = argparse.ArgumentParser(
         description="Simple jail management tool", 
         epilog="Visit http://github.com/xnicholas/lockup for more information.")
@@ -54,6 +60,7 @@ def create_parser():
     # 'create' sub-command.
     parser_create = subparsers.add_parser('create', help='creates jail')
     parser_create.add_argument('hostname', type=validate_hostname)
+    parser_create.add_argument('interface', type=validate_interface)
     parser_create.add_argument('ip_address', type=validate_ip_address)
     parser_create.add_argument('name', type=validate_name)
     parser_create.add_argument('release', choices=['11.0-RELEASE'])
@@ -90,19 +97,94 @@ def parse_args(parser):
         elif args['cmd'] == 'list':
             list_jails()
 
-def create_jail(args):
+def check_path_jails_exists(path_jails):
     if not os.path.isdir(path_jails):
         sys.stderr.write("\n*** Path "+path_jails+" needs to be a directory. ***\n\n" \
         + "If you use zfs you can create a pool by running the following command:\n" \
         + "zfs create -o mountpoint="+path_jails+" "+zroot_jails+"\n\n")
         sys.exit(1)
 
+def check_jail_dir_doesnt_exist(path_jail):
+    if os.path.exists(path_jail):
+        sys.stderr.write("\n*** Path "+path_jail+" already exists. Check if jail is not already created. ***\n\n")
+        sys.exit(1)
+
+def check_interface_and_ip_address(interface, ip):
+    p = Popen(['ifconfig', interface], stdout=PIPE, stderr=PIPE)
+    out, err = p.communicate()
+    out = out.decode('utf-8')
+    if 'inet '+ip not in re.findall(r'inet [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}', out):
+        sys.stderr.write("\n*** IP address "+ip+" cannot be found on any interface. ***\n\n" \
+        + "Please clone the loopback interface and attach range of IP addresses for jails.\n\n" \
+        + "For example, you can put the following to your /etc/rc.conf:\n" \
+        + "cloned_interfaces=\"lo1\"\n" \
+        + "ifconfig_lo1=\"10.0.0.11-50/32\"\n" \
+        + "and restart your networking.\n\n" \
+        + "If you do not want to restart, you can add interface manually:\n" \
+        + "ifconfig lo create\n" \
+        + "ifconfig lo1 inet 10.0.0.11\n\n" \
+        + "If you just need to add IP address to existing interface run:\n" \
+        + "ifconfig lo1 alias 10.0.0.12\n\n")
+        sys.exit(1)
+
+def alter_jail_conf(name, hostname, path, interface, ip_address):
+    # Add base configuration to jail.conf; only if the file does not exist.
+    # If file exists then we'll assume that the base configuration is already there.
+    if not os.path.isfile('/etc/jail.conf'):
+        with open('/etc/jail.conf', 'w') as file:
+            file.writelines("exec.start=\"/bin/sh /etc/rc\";\n"
+            + "exec.stop=\"/bin/sh /etc/rc.shutdown\";\n"
+            + "exec.clean;\n"
+            + "mount.devfs;\n\n")
+
+    # Add jail definition to jail.conf.
+    with open('/etc/jail.conf', 'a') as file:
+        file.writelines(name+" {\n"
+        + "    host.hostname =\""+hostname+"\";\n"
+        + "    path = \""+path+"\";\n"
+        + "    interface = \""+interface+"\";\n"
+        + "    ip4.addr = \""+ip_address+"\";\n"
+        + "}\n")
+
+# @todo Add handling errors and exceptions.
+def create_jail(args):
+    # Check if jails directory exists.
+    check_path_jails_exists(path_jails)
+
+    # Check if jail directory does not exist.
+    path_jail = path_jails+'/'+args['name']
+    check_jail_dir_doesnt_exist(path_jail)
+
+    # Check if IP address is assigned to any of the interfaces.
+    check_interface_and_ip_address(args['interface'], args['ip_address'])
+
+    # Create jail directory.
+    os.makedirs(path_jail, 0x755)
+
+    # Download FreeBSD and insert into jail directory.
+    urllib.request.urlretrieve(url_freebsd+'/'+args['release']+'/base.txz', path_jail+'/base.txz')
+    Popen(['tar', '-xvf', path_jail+'/base.txz', '-C', path_jail+'/'], stdout=PIPE, stderr=PIPE)
+    for part in ['src', 'ports', 'kernel', 'lib32', 'doc', 'tests']:
+        if args[part] is not None:
+            urllib.request.urlretrieve(url_freebsd+'/'+args['release']+'/'+part+'.txz', path_jail+'/'+part+'.txz')
+            Popen(['tar', '-xvf', path_jail+'/'+part+'.txz', '-C', path_jail+'/'], stdout=PIPE, stderr=PIPE)
+
+    # Copy resolv, localtime and add hostname to jail.
+    shutil.copy('/etc/resolv.conf', path_jail+'/etc/resolv.conf')
+    shutil.copy('/etc/localtime', path_jail+'/etc/localtime')
+    with open(path_jail+'/etc/rc.conf', 'a') as file:
+        file.writelines("hostname=\""+args['hostname']+"\"\n")
+
+    # Adding information to jail.conf.
+    alter_jail_conf(args['name'], args['hostname'], path_jail, args['interface'], args['ip_address'])
+
+    
 
 def remove_jail(args):
     print(args)
 
 def list_jails():
-    # Using 'jls' command to get the currently running jails.
+    # Use 'jls' command to get the currently running jails.
     p = Popen(['jls'], stdout=PIPE, stderr=PIPE)
     out, err = p.communicate()
     print(format_list.format("ID", "Name", "IP", "Hostname"))
