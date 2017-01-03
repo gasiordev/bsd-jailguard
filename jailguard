@@ -90,13 +90,13 @@ def parse_args(parser):
     # Main sub-command switch.
     if 'cmd' in args:
         if args['cmd'] == 'create':
-            create_jail(args)
+            cmd_create(args)
     
         elif args['cmd'] == 'remove':
-            remove_jail(args)
+            cmd_remove(args)
     
         elif args['cmd'] == 'list':
-            list_jails()
+            cmd_list()
 
 def get_jail_config(name):
     if not os.path.isfile('/etc/jail.conf'):
@@ -231,8 +231,11 @@ def check_jail_running(name):
         i+=1
     return False
 
+def stop_jail(name):
+    run(['jail', '-r', name], stdout=PIPE, stderr=PIPE)
+
 # @todo Add handling errors and exceptions.
-def create_jail(args):
+def cmd_create(args):
     # Check if jail does not exist already.
     jail_config = get_jail_config(args['name'])
     if jail_config is not None:
@@ -277,7 +280,7 @@ def create_jail(args):
 
     sys.stdout.write("Your jail "+args['name']+" should be now created.\n\n")
 
-def remove_jail(args):
+def cmd_remove(args):
     # Check if jail exists.
     jail_config = get_jail_config(args['name'])
     if jail_config is None:
@@ -287,7 +290,7 @@ def remove_jail(args):
     # Check if jail is not running. We can stop it only if --stop arg was passed.
     if check_jail_running(args['name']):
         if args['stop'] is not None and args['stop'] == 1:
-            run(['jail', '-r', args['name']], stdout=PIPE, stderr=PIPE)
+            stop_jail(args['name'])
         else:
             sys.stderr.write("\n*** Jail is running. Please stop it or add --stop argument.\n\n")
             sys.exit(1)
@@ -301,7 +304,7 @@ def remove_jail(args):
 
     sys.stdout.write("Your jail "+args['name']+" should be now removed.\n\n")
 
-def list_jails():
+def cmd_list():
     # Use 'jls' command to get the currently running jails.
     p = Popen(['jls'], stdout=PIPE, stderr=PIPE)
     out, err = p.communicate()
