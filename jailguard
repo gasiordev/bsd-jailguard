@@ -14,7 +14,7 @@
 # * allow raw sockets.
 
 from subprocess import Popen, PIPE, run
-import argparse, binascii, re, os, sys, urllib.request, shutil
+import argparse, binascii, re, os, sys, urllib.request, shutil, fileinput
 from sys import stdout
 
 VERSION=0.1
@@ -128,6 +128,44 @@ def get_jail_config(name):
             return details
     return None
 
+def remove_jail_config(name, comment_out):
+    if comment_out is not None and comment_out == 1:
+        with open('/etc/jail.conf','r') as file:
+            found = False
+            contents = ''
+            for line in file:
+                tmp_line = re.sub(r'(^[\s]+)|([\s]+$)', '', line)
+                if not found:
+                    name_match =re.match(r'^(\w+)[\s]+{', tmp_line)
+                    if name_match is not None:
+                        jail_name = name_match.group(1)
+                        if jail_name == name:
+                            found = True
+                            contents += '#'+line
+                        else:
+                            contents += line
+                    else:
+                        contents += line
+                else:
+                    contents += '#'+line
+                    if re.match(r'}$', line):
+                        found = False
+        if contents is not None:
+            file = open('/etc/jail.conf', 'w')
+            file.write(contents)
+            file.close()
+
+    else:
+        file = open('/etc/jail.conf', 'r')
+        contents = file.read()
+        file.close()
+
+        # Assuming that '}nextjailname' never occurs.
+        contents = (re.sub(r'[^a-zA-Z0-9_]'+name+'[\s]+{[^}]*}', '', contents))
+        file = open('/etc/jail.conf', 'w')
+        file.write(contents)
+        file.close()
+
 def check_path_jails_exists(path_jails):
     if not os.path.isdir(path_jails):
         sys.stderr.write("\n*** Path "+path_jails+" needs to be a directory. ***\n\n" \
@@ -232,7 +270,7 @@ def remove_jail(args):
         sys.exit(1)
 
     path_jail = path_jails+'/'+args['name']
-    #remove_jail_config(args['name'], args['comment_out_config'])
+    remove_jail_config(args['name'], args['comment_out_config'])
 
     if args['remove_files'] is not None and args['remove_files'] == 1:
         run(['chflags', '-R', 'noschg', path_jail], stdout=PIPE, stderr=PIPE)
