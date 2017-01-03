@@ -266,7 +266,7 @@ def remove_jail(args):
     # Check if jail exists.
     jail_config = get_jail_config(args['name'])
     if jail_config is None:
-        sys.stderr.write("\n*** Jail "+args['name']+" does not exist in /etc/jail.conf.\n\n")
+        sys.stderr.write("\n*** Jail "+args['name']+" does not exist in /etc/jail.conf. ***\n\n")
         sys.exit(1)
 
     path_jail = path_jails+'/'+args['name']
