@@ -90,6 +90,11 @@ def create_parser():
     parser_stop = subparsers.add_parser('stop', help='stops jail')
     parser_stop.add_argument('name', type=validate_name)
     parser_stop.set_defaults(cmd='stop')
+
+    # 'restart' sub-command.
+    parser_restart = subparsers.add_parser('restart', help='restarts jail')
+    parser_restart.add_argument('name', type=validate_name)
+    parser_restart.set_defaults(cmd='restart')
     
     return parser
 
@@ -109,6 +114,8 @@ def parse_args(parser):
             cmd_stop(args)
         elif args['cmd'] == 'start':
             cmd_start(args)
+        elif args['cmd'] == 'restart':
+            cmd_restart(args)
 
 def get_jail_config(name):
     if not os.path.isfile('/etc/jail.conf'):
@@ -249,6 +256,10 @@ def stop_jail(name):
 def start_jail(name):
     run(['jail', '-c', name], stdout=PIPE, stderr=PIPE)
 
+def restart_jail(name):
+    stop_jail(name)
+    start_jail(name)
+
 # @todo Add handling errors and exceptions.
 def cmd_create(args):
     # Check if jail does not exist already.
@@ -360,6 +371,15 @@ def cmd_start(args):
         sys.exit(1)
 
     start_jail(args['name'])
+
+def cmd_restart(args):
+    # Check if jail is running.
+    if not check_jail_running(args['name']):
+        sys.stderr.write("\n*** Jail "+args['name']+" is not running. ***\n\n")
+        sys.exit(1)
+
+    restart_jail(args['name'])
+    sys.stdout.write("Your jail "+args['name']+" should be now restarted.\n\n")
 
 def main():
     parser = create_parser()
