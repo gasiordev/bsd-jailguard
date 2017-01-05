@@ -71,7 +71,7 @@ def create_parser():
     
     # 'remove' sub-command.
     parser_remove = subparsers.add_parser('remove', help='removes jail')
-    parser_remove.add_argument('name')
+    parser_remove.add_argument('name', type=validate_name)
     parser_remove.add_argument('--comment-out-config', action='store_const', const=1, help='comments out config instead of removing')
     parser_remove.add_argument('--remove-files', action='store_const', const=1, help='removes jail directory')
     parser_remove.add_argument('--stop', action='store_const', const=1, help='stops jail if running')
@@ -80,6 +80,16 @@ def create_parser():
     # 'list' sub-command.
     parser_list = subparsers.add_parser('list', help='lists all jails')
     parser_list.set_defaults(cmd='list')
+
+    # 'start' sub-command.
+    parser_start = subparsers.add_parser('start', help='starts jail')
+    parser_start.add_argument('name', type=validate_name)
+    parser_start.set_defaults(cmd='start')
+
+    # 'stop' sub-command.
+    parser_stop = subparsers.add_parser('stop', help='stops jail')
+    parser_stop.add_argument('name', type=validate_name)
+    parser_stop.set_defaults(cmd='stop')
     
     return parser
 
@@ -91,12 +101,14 @@ def parse_args(parser):
     if 'cmd' in args:
         if args['cmd'] == 'create':
             cmd_create(args)
-    
         elif args['cmd'] == 'remove':
             cmd_remove(args)
-    
         elif args['cmd'] == 'list':
             cmd_list()
+        elif args['cmd'] == 'stop':
+            cmd_stop(args)
+        elif args['cmd'] == 'start':
+            cmd_start(args)
 
 def get_jail_config(name):
     if not os.path.isfile('/etc/jail.conf'):
@@ -234,6 +246,9 @@ def check_jail_running(name):
 def stop_jail(name):
     run(['jail', '-r', name], stdout=PIPE, stderr=PIPE)
 
+def start_jail(name):
+    run(['jail', '-c', name], stdout=PIPE, stderr=PIPE)
+
 # @todo Add handling errors and exceptions.
 def cmd_create(args):
     # Check if jail does not exist already.
@@ -322,6 +337,29 @@ def cmd_list():
             jail_name = re.search(r'\/[a-zA-Z0-9\-_\.]+$', jail_path).group(0)
             jail_name = re.sub(r'^\/', '', jail_name)
             print(format_list.format(jail_id, jail_name, jail_ip, jail_hostname))
+
+def cmd_stop(args):
+    # Check if jail is running.
+    if not check_jail_running(args['name']):
+        sys.stderr.write("\n*** Jail "+args['name']+" is not running. ***\n\n")
+        sys.exit(1)
+
+    stop_jail(args['name'])
+    sys.stdout.write("Your jail "+args['name']+" should be now stopped.\n\n")
+
+def cmd_start(args):
+    # Check if jail exists.
+    jail_config = get_jail_config(args['name'])
+    if jail_config is None:
+        sys.stderr.write("\n*** Jail "+args['name']+" does not exist in /etc/jail.conf. ***\n\n")
+        sys.exit(1)
+
+    # Check if jail is not running. We can stop it only if --stop arg was passed.
+    if check_jail_running(args['name']):
+        sys.stderr.write("\n*** Jail "+args['name']+" is already running.\n\n")
+        sys.exit(1)
+
+    start_jail(args['name'])
 
 def main():
     parser = create_parser()
