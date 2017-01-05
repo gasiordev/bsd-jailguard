@@ -22,7 +22,7 @@ VERSION=0.1
 # @todo Base to be added as an optional argument later.
 path_jails='/usr/local/jails'
 zroot_jails='zroot/jails'
-format_list="{: <3} {: <20} {: <15} {: <30}"
+format_list="{: <15} {: <15} {: <30} {: <19}"
 url_freebsd='ftp://ftp.freebsd.org/pub/FreeBSD/releases/amd64'
 
 def validate_hostname(string):
@@ -79,6 +79,7 @@ def create_parser():
     
     # 'list' sub-command.
     parser_list = subparsers.add_parser('list', help='lists all jails')
+    parser_list.add_argument('--show', choices=['all', 'stopped', 'running'], default='all')
     parser_list.set_defaults(cmd='list')
 
     # 'start' sub-command.
@@ -109,7 +110,7 @@ def parse_args(parser):
         elif args['cmd'] == 'remove':
             cmd_remove(args)
         elif args['cmd'] == 'list':
-            cmd_list()
+            cmd_list(args)
         elif args['cmd'] == 'stop':
             cmd_stop(args)
         elif args['cmd'] == 'start':
@@ -260,6 +261,80 @@ def restart_jail(name):
     stop_jail(name)
     start_jail(name)
 
+def print_jails_running():
+    p = Popen(['jls', '-N'], stdout=PIPE, stderr=PIPE)
+    out, err = p.communicate()
+    print(format_list.format('Name', 'IP', 'Hostname', 'Path'))
+    i = 0
+    for line in out.decode('utf-8').split("\n"):
+        if i>0:
+            line = re.sub('^[\s]+', '', line)
+            line = re.sub('[\s]{2,}', ' ', line)
+            if line == '':
+                break
+            line_arr = line.split(' ')
+            jail_name = line_arr[0]
+            jail_ip = line_arr[1]
+            jail_hostname = line_arr[2]
+            jail_path = re.sub(r'\/$', '', line_arr[3])
+            print(format_list.format(jail_name, jail_ip, jail_hostname, jail_path))
+        i += 1
+
+def print_jails_all(exclude_array = None):
+    print(format_list.format('Name', 'IP', 'Hostname', 'Path'))
+    if not os.path.isfile('/etc/jail.conf'):
+        return None
+    with open('/etc/jail.conf') as file:
+        jails = {}
+        current_jail = ''
+        for line in file:
+            line = re.sub(r'(^[\s]+)|([\s]+$)', '', line)
+            if current_jail == '':
+                name_match =re.match(r'^(\w+)[\s]+{', line)
+                if name_match is not None:
+                    jail_name = name_match.group(1)
+                    current_jail = jail_name
+            else:
+                if re.match(r'^}', line):
+                    current_jail = ''
+                    continue
+                reset_current_jail_after_this = False
+                if re.match(r'}$', line):
+                    reset_current_jail_after_this = True
+                    line = re.sub(r'[\s]*}$', '', line)
+                line = re.sub(r'["]*;$', '', line)
+                line = re.sub(r'[\s]*=[\s]*["]{0,1}', '=', line)
+                (key, val) = line.split('=')
+                if current_jail not in jails.keys():
+                    jails[current_jail] = {}
+                jails[current_jail][key] = val
+                if reset_current_jail_after_this:
+                    current_jail = ''
+        jail_names = jails.keys()
+        for n in jail_names:
+            if exclude_array is None or n not in exclude_array:
+                print(format_list.format(n, jails[n]['ip4.addr'], jails[n]['host.hostname'], jails[n]['path']))
+
+def print_jails_stopped():
+    p = Popen(['jls', '-N'], stdout=PIPE, stderr=PIPE)
+    out, err = p.communicate()
+
+    # Getting running jails.
+    jails_running = []
+    i = 0
+    for line in out.decode('utf-8').split("\n"):
+        if i>0:
+            line = re.sub('^[\s]+', '', line)
+            line = re.sub('[\s]{2,}', ' ', line)
+            if line == '':
+                break
+            line_arr = line.split(' ')
+            jail_name = line_arr[0]
+            jails_running.append(jail_name)
+        i += 1
+
+    print_jails_all(jails_running)
+
 # @todo Add handling errors and exceptions.
 def cmd_create(args):
     # Check if jail does not exist already.
@@ -330,24 +405,13 @@ def cmd_remove(args):
 
     sys.stdout.write("Your jail "+args['name']+" should be now removed.\n\n")
 
-def cmd_list():
-    # Use 'jls' command to get the currently running jails.
-    p = Popen(['jls'], stdout=PIPE, stderr=PIPE)
-    out, err = p.communicate()
-    print(format_list.format("ID", "Name", "IP", "Hostname"))
-    for line in out.decode('utf-8').split('\n'):
-        line = re.sub('^[ ]+', '', line)
-        line = re.sub('[ ]{2,}', ' ', line)
-        if re.match('^[0-9]+', line):
-            line_arr = line.split(' ')
-            jail_id = line_arr[0]
-            jail_ip = line_arr[1]
-            jail_hostname = line_arr[2]
-            # Assuming that path contains name of the jail.
-            jail_path = re.sub(r'\/$', '', line_arr[3])
-            jail_name = re.search(r'\/[a-zA-Z0-9\-_\.]+$', jail_path).group(0)
-            jail_name = re.sub(r'^\/', '', jail_name)
-            print(format_list.format(jail_id, jail_name, jail_ip, jail_hostname))
+def cmd_list(args):
+    if args['show'] == 'running':
+        print_jails_running()
+    elif args['show'] == 'stopped':
+        print_jails_stopped()
+    elif args['show'] == 'all':
+        print_jails_all()
 
 def cmd_stop(args):
     # Check if jail is running.
