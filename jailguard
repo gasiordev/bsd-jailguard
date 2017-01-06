@@ -77,6 +77,7 @@ def create_parser():
     parser_remove.add_argument('--comment-out-config', action='store_const', const=1, help='comments out config instead of removing')
     parser_remove.add_argument('--remove-files', action='store_const', const=1, help='removes jail directory')
     parser_remove.add_argument('--stop', action='store_const', const=1, help='stops jail if running')
+    parser_remove.add_argument('--unassign-ip-address', action='store_const', const=1, help='unassign ip address from interface')
     parser_remove.set_defaults(cmd='remove')
     
     # 'list' sub-command.
@@ -217,6 +218,9 @@ def check_interface(interface, create):
 def assign_ip_to_interface(interface, ip):
     run(['ifconfig', interface, 'alias', ip], stdout=PIPE, stderr=PIPE)
 
+def unassign_ip_from_interface(interface, ip):
+    run(['ifconfig', interface, '-alias', ip], stdout=PIPE, stderr=PIPE)
+
 def check_interface_and_ip_address(interface, ip, assign):
     p = Popen(['ifconfig', interface], stdout=PIPE, stderr=PIPE)
     out, err = p.communicate()
@@ -237,6 +241,9 @@ def check_interface_and_ip_address(interface, ip, assign):
             + "If you just need to add IP address to existing interface run:\n" \
             + "ifconfig lo1 alias 10.0.0.12\n\n")
             sys.exit(1)
+
+def alter_rc_conf(action='add', cloned_interface=None, ip_alias=None):
+    return False
 
 def alter_jail_conf(name, hostname, path, interface, ip_address, allow_raw_sockets):
     # Add base configuration to jail.conf; only if the file does not exist.
@@ -422,6 +429,10 @@ def cmd_remove(args):
 
     path_jail = path_jails+'/'+args['name']
     remove_jail_config(args['name'], args['comment_out_config'])
+
+    # Unassign IP address if prompted.
+    if args['unassign_ip_address'] is not None and args['unassign_ip_address'] == 1:
+        unassign_ip_from_interface(jail_config['interface'], jail_config['ip4.addr'])
 
     if args['remove_files'] is not None and args['remove_files'] == 1:
         run(['chflags', '-R', 'noschg', path_jail], stdout=PIPE, stderr=PIPE)
