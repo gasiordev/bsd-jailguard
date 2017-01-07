@@ -45,7 +45,7 @@ def validate_interface(string):
     return string
 
 def validate_name(string):
-    if not re.match(r'^[a-z0-9\-_]+$', string):
+    if not re.match(r'^(\w+)$', string):
         raise argparse.ArgumentTypeError('')
     return string
 
