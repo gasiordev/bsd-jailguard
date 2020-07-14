@@ -18,30 +18,31 @@ func getCLIVersionHandler(j *Jailguard) func(*cli.CLI) int {
 func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	c := cli.NewCLI("Jailguard", "Create and manage jails in FreeBSD", "Mikolaj Gasior")
 
-	//        cmdUp := c.AddCmd("up", "Creates and starts jails", getCLIUpHandler(b))
-	//        cmdUp.AddFlag("jailguardfile", "f", "file", "Jailguardfile", cli.TypePathFile|cli.MustExist)
-	//        cmdUp.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	//        cmdUp.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	// state list
+	// state remove type.name
+	// state import type.name
+
+	// apply -f file.jail
+	// destroy [-n jail OR -f file.jail]
+
+	// network show
+
+	// template list
+	// template remove template_name
+	// template create jail_name template_name
+	// template update template_name base_name
+
+	// base list
+	// base download base_name
+	// base update base_name
+
+	// TODO queue:
+	// * implement simple state stored in a file in JSON; simple open() and save() - all based on a struct
+	// * simple removing by [type][name]
+	// * state_list cmd
+	// * state_remove cmd
 	//
-	//        cmdStop := c.AddCmd("stop", "Stop jails", getCLIStopHandler(b))
-	//        cmdStop.AddFlag("jailguardfile", "f", "file", "Jailguardfile", cli.TypePathFile|cli.MustExist)
-	//        cmdStop.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	//        cmdStop.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
-	//
-	//        cmdShow := c.AddCmd("show", "Shows jails", getCLIShowHandler(b))
-	//        cmdShow.AddFlag("jailguardfile", "f", "file", "Jailguardfile", cli.TypePathFile|cli.MustExist)
-	//        cmdShow.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	//        cmdShow.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
-	//
-	//        cmdDestroy := c.AddCmd("destroy", "Destroys jails", getCLIDestroyHandler(b))
-	//        cmdDestroy.AddFlag("jailguardfile", "f", "file", "Jailguardfile", cli.TypePathFile|cli.MustExist)
-	//        cmdDestroy.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	//        cmdDestroy.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
-	//
-	//        cmdExec := c.AddCmd("exec", "Exec commands on jail", getCLIExecHandler(b))
-	//        cmdExec.AddFlag("jailguardfile", "f", "file", "Jailguardfile", cli.TypePathFile|cli.MustExist)
-	//        cmdExec.AddArg("guest", "JAIL", "", cli.TypeString|cli.Required)
-	//        cmdExec.AddArg("command", "COMMAND", "", cli.TypeString|cli.Required)
+	// * base management
 
 	_ = c.AddCmd("version", "Prints version", getCLIVersionHandler(j))
 
