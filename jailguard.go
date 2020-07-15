@@ -20,6 +20,7 @@ const DIRTEMPLATES = "templates"
 const DIRSTATE = "state"
 const DIRJAILS = "jails"
 const DIRTMP = "tmp"
+const FILESTATE = "jailguard.jailstate"
 const NETIF = "1337"
 
 const LOGINF = 1
@@ -68,6 +69,31 @@ func (j *Jailguard) Log(t int, s string) {
 		fmt.Fprintf(j.cli.GetStdout(), "* "+s+"\n")
 	}
 }
+
+func (j *Jailguard) getStateFilePath() string {
+	return PATHDATA + "/" + DIRSTATE + "/" + FILESTATE
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Commands from CLI
+
+func (j *Jailguard) ListStateItems() error {
+	st, err := NewState(j.getStateFilePath())
+	if err != nil {
+		return err
+	}
+	st.Logger = func(t int, s string) {
+		j.Log(t, s)
+	}
+
+	err = st.PrintItems(j.cli.GetStdout())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 func NewJailguard() *Jailguard {
 	j := &Jailguard{}
