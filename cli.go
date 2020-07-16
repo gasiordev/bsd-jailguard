@@ -37,8 +37,12 @@ func (j *Jailguard) getCLIStateRemoveHandler() func(*cli.CLI) int {
 			j.Debug = true
 		}
 
-		j.Log(LOGERR, "Not implemented")
-		return 10
+		err := j.RemoveStateItem(c.Arg("item_type"), c.Arg("item_name"))
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
 	}
 	return fn
 }
@@ -64,10 +68,14 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	state_remove := c.AddCmd("state_remove", "Remove item from state", j.getCLIStateRemoveHandler())
 	state_remove.AddArg("item_type", "TYPE", "", cli.TypeString|cli.Required)
 	state_remove.AddArg("item_name", "NAME", "", cli.TypeString|cli.Required)
+	state_remove.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	state_remove.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
 	state_import := c.AddCmd("state_import", "Import item to state", j.getCLIStateImportHandler())
 	state_import.AddArg("item_type", "TYPE", "", cli.TypeString|cli.Required)
-	state_import.AddArg("item_name", "NAME", "", cli.TypeString|cli.Required)
+	state_import.AddArg("item_name", "NAME", "", cli.TypeAlphanumeric|cli.Required)
+	state_import.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	state_import.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
 	// state list
 	// state remove type.name

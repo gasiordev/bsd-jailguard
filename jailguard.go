@@ -74,16 +74,37 @@ func (j *Jailguard) getStateFilePath() string {
 	return PATHDATA + "/" + DIRSTATE + "/" + FILESTATE
 }
 
+func (j *Jailguard) getState() (*State, error) {
+	st, err := NewState(j.getStateFilePath())
+	if err != nil {
+		return nil, err
+	}
+	st.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+	return st, nil
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Commands from CLI
 
-func (j *Jailguard) ListStateItems() error {
-	st, err := NewState(j.getStateFilePath())
+func (j *Jailguard) RemoveStateItem(t string, n string) error {
+	st, err := j.getState()
 	if err != nil {
 		return err
 	}
-	st.Logger = func(t int, s string) {
-		j.Log(t, s)
+
+	err = st.RemoveItem(t, n)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (j *Jailguard) ListStateItems() error {
+	st, err := j.getState()
+	if err != nil {
+		return err
 	}
 
 	err = st.PrintItems(j.cli.GetStdout())
