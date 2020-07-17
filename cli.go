@@ -59,6 +59,30 @@ func (j *Jailguard) getCLIStateImportHandler() func(*cli.CLI) int {
 	return fn
 }
 
+func (j *Jailguard) getCLIBaseDownloadHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		ow := false
+		if c.Flag("overwrite") == "true" {
+			ow = true
+		}
+
+		err := j.DownloadBase(c.Arg("release"), ow)
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
 func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	c := cli.NewCLI("Jailguard", "Create and manage jails in FreeBSD", "Mikolaj Gasior")
 
@@ -77,8 +101,14 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	state_import.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
 	state_import.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
-	// state list
-	// state remove type.name
+	// base commands
+	base_download := c.AddCmd("base_download", "Downloads FreeBSD base", j.getCLIBaseDownloadHandler())
+	// TODO: Change 'release' flag to TypeAlphanumeric once AllowHyphen gets implemented in go-cli
+	base_download.AddArg("release", "RELEASE", "", cli.TypeString|cli.Required)
+	base_download.AddFlag("overwrite", "w", "", "Overwrite if exists", cli.TypeBool)
+	base_download.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	base_download.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+
 	// state import type.name
 
 	// apply -f file.jail
@@ -92,16 +122,12 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	// template update template_name base_name
 
 	// base list
-	// base download base_name
-	// base update base_name
+	// base remove
 
 	// TODO queue:
-	// * implement simple state stored in a file in JSON; simple open() and save() - all based on a struct
-	// * simple removing by [type][name]
-	// * state_list cmd
-	// * state_remove cmd
-	//
-	// * base management
+	// base_remove - with -y otherwise ask for removal (cli does not have Stdin, new issue?)
+	// base_list -> needs to call state_list with 'base' filter on it
+	// state_import -> just like download: check if exists in state, create new base obj, check if valid, add base, save
 
 	_ = c.AddCmd("version", "Prints version", getCLIVersionHandler(j))
 

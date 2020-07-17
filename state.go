@@ -43,6 +43,23 @@ func (st *State) SetDefaultValues() {
 	st.Iteration = 1
 }
 
+func (st *State) GetBase(rls string) (*Base, error) {
+	if st.Bases == nil {
+		return nil, nil
+	}
+	if st.Bases[rls] == nil {
+		return nil, nil
+	}
+	return st.Bases[rls], nil
+}
+
+func (st *State) AddBase(rls string, bs *Base) {
+	if st.Bases == nil {
+		st.Bases = make(map[string]*Base)
+	}
+	st.Bases[rls] = bs
+}
+
 func (st *State) RemoveItem(t string, n string) error {
 	if n == "" {
 		return errors.New("Invalid name")
