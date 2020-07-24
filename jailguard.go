@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	//"errors"
+	"errors"
 	"fmt"
 	"github.com/gasiordev/go-cli"
 	//"io/ioutil"
@@ -113,13 +113,49 @@ func (j *Jailguard) RemoveStateItem(t string, n string) error {
 	return nil
 }
 
-func (j *Jailguard) ListStateItems() error {
+func (j *Jailguard) ImportStateItem(t string, n string) error {
 	st, err := j.getState()
 	if err != nil {
 		return err
 	}
 
-	err = st.PrintItems(j.cli.GetStdout())
+	if t == "base" {
+		j.Log(LOGDBG, "Checking if base "+n+" already exists in the state file")
+		bs, err := st.GetBase(n)
+		if err != nil {
+			return err
+		}
+		if bs != nil {
+			j.Log(LOGERR, "Base "+n+" already exists. Remove it first before importing a new one")
+			return errors.New("State item already exists")
+		}
+
+		bs = j.getBase(n)
+		j.Log(LOGDBG, "Checking if base "+n+" can be imported into state file")
+		err = bs.Import()
+		if err != nil {
+			return err
+		}
+		st.AddBase(n, bs)
+	} else {
+		return errors.New("Invalid item type")
+	}
+
+	j.Log(LOGINF, "Saving state file")
+	err = st.Save()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (j *Jailguard) ListStateItems(t string) error {
+	st, err := j.getState()
+	if err != nil {
+		return err
+	}
+
+	err = st.PrintItems(j.cli.GetStdout(), t)
 	if err != nil {
 		return err
 	}
@@ -161,6 +197,42 @@ func (j *Jailguard) DownloadBase(rls string, ow bool) error {
 			return nil
 		}
 	}
+
+	j.Log(LOGINF, "Saving state file")
+	err = st.Save()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (j *Jailguard) RemoveBase(rls string) error {
+	st, err := j.getState()
+	if err != nil {
+		return err
+	}
+
+	j.Log(LOGDBG, "Checking for base "+rls+" in state file")
+	bs, err := st.GetBase(rls)
+	if err != nil {
+		return err
+	}
+	if bs == nil {
+		j.Log(LOGDBG, "Base "+rls+" not found in state file")
+		return nil
+	}
+	bs.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+
+	j.Log(LOGINF, "Removing base "+rls)
+	err = bs.Remove()
+	if err != nil {
+		return err
+	}
+
+	st.RemoveItem("base", rls)
 
 	j.Log(LOGINF, "Saving state file")
 	err = st.Save()

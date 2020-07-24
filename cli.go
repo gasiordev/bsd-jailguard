@@ -21,7 +21,7 @@ func (j *Jailguard) getCLIStateListHandler() func(*cli.CLI) int {
 			j.Debug = true
 		}
 
-		err := j.ListStateItems()
+		err := j.ListStateItems("")
 		if err != nil {
 			j.Log(LOGERR, err.Error())
 			return 2
@@ -53,8 +53,13 @@ func (j *Jailguard) getCLIStateImportHandler() func(*cli.CLI) int {
 			j.Debug = true
 		}
 
-		j.Log(LOGERR, "Not implemented")
-		return 10
+		err := j.ImportStateItem(c.Arg("item_type"), c.Arg("item_name"))
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+
+		return 0
 	}
 	return fn
 }
@@ -74,6 +79,37 @@ func (j *Jailguard) getCLIBaseDownloadHandler() func(*cli.CLI) int {
 		}
 
 		err := j.DownloadBase(c.Arg("release"), ow)
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
+func (j *Jailguard) getCLIBaseRemoveHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		err := j.RemoveBase(c.Arg("release"))
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
+func (j *Jailguard) getCLIBaseListHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		err := j.ListStateItems("bases")
 		if err != nil {
 			j.Log(LOGERR, err.Error())
 			return 2
@@ -109,10 +145,17 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	base_download.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
 	base_download.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
-	// state import type.name
+	_ = c.AddCmd("base_list", "List FreeBSD bases", j.getCLIBaseListHandler())
 
-	// apply -f file.jail
-	// destroy [-n jail OR -f file.jail]
+	base_remove := c.AddCmd("base_remove", "Removes FreeBSD base", j.getCLIBaseRemoveHandler())
+	base_remove.AddArg("release", "RELEASE", "", cli.TypeString|cli.Required)
+	base_remove.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	base_remove.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+
+	// jail_create -f file.jail
+	// jail_stop -n jail
+	// jail_start -n jail
+	// jail_destroy -n jail
 
 	// network show
 
@@ -121,13 +164,17 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	// template create jail_name template_name
 	// template update template_name base_name
 
-	// base list
-	// base remove
+	// apply -f ???
+	// destroy -f ???
 
 	// TODO queue:
-	// base_remove - with -y otherwise ask for removal (cli does not have Stdin, new issue?)
-	// base_list -> needs to call state_list with 'base' filter on it
-	// state_import -> just like download: check if exists in state, create new base obj, check if valid, add base, save
+	// jail_create -> but let's make a proper check of the file + what do we do with networking etc??? - should they be flags???
+	// jail_destroy
+	// jail_stop - probably part of destroy
+	// jail_start - probably part of create
+
+	// state_import for jail
+	// state_check for base and jail: checks if state is up-to-date
 
 	_ = c.AddCmd("version", "Prints version", getCLIVersionHandler(j))
 

@@ -86,6 +86,43 @@ func (bs *Base) Download(ow bool) error {
 	return nil
 }
 
+func (bs *Base) Import() error {
+	bs.logger(LOGDBG, "Checking if "+bs.Dirpath+"/base.txz exists")
+	_, err := os.Stat(bs.Dirpath + "/base.txz")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return errors.New("Base file " + bs.Dirpath + "/base.txz does not exist")
+		} else {
+			bs.logger(LOGDBG, "Error with checking "+bs.Dirpath+"/base.txz existance: "+err.Error())
+		}
+	}
+	bs.logger(LOGDBG, "Base source exist so it can be imported")
+	return nil
+}
+
+func (bs *Base) Remove() error {
+	bs.logger(LOGDBG, "Checking if "+bs.Dirpath+" exists")
+	_, err := os.Stat(bs.Dirpath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			bs.logger(LOGDBG, bs.Dirpath+"does not exist. Nothing to remove")
+			return nil
+		} else {
+			bs.logger(LOGDBG, "Error with checking dir "+bs.Dirpath+" existance: "+err.Error())
+			return err
+		}
+	}
+
+	err = os.RemoveAll(bs.Dirpath)
+	if err != nil {
+		bs.logger(LOGERR, "Error removing dir "+bs.Dirpath+". Please remove the directory manually and remove the state")
+		return errors.New("Error removing base dir")
+	}
+	bs.logger(LOGDBG, bs.Dirpath+"has been removed")
+
+	return nil
+}
+
 func NewBase(rls string, dir string) *Base {
 	bs := &Base{}
 	bs.SetDefaultValues()

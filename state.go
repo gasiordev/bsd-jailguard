@@ -66,24 +66,40 @@ func (st *State) RemoveItem(t string, n string) error {
 	}
 
 	if t == "base" {
-		if st.Bases[n] != nil {
-			st.Bases[n] = nil
+		m := make(map[string]*Base)
+		for k, _ := range st.Bases {
+			if k != n {
+				m[k] = st.Bases[k]
+			}
 		}
+		st.Bases = m
 	} else if t == "template" {
-		if st.Templates[n] != nil {
-			st.Templates[n] = nil
+		m := make(map[string]*Template)
+		for k, _ := range st.Templates {
+			if k != n {
+				m[k] = st.Templates[k]
+			}
 		}
 	} else if t == "jail" {
-		if st.Jails[n] != nil {
-			st.Jails[n] = nil
+		m := make(map[string]*Jail)
+		for k, _ := range st.Jails {
+			if k != n {
+				m[k] = st.Jails[k]
+			}
 		}
 	} else if t == "network_interface" {
-		if st.NetworkInterfaces[n] != nil {
-			st.NetworkInterfaces[n] = nil
+		m := make(map[string]*NetworkInterface)
+		for k, _ := range st.NetworkInterfaces {
+			if k != n {
+				m[k] = st.NetworkInterfaces[k]
+			}
 		}
 	} else if t == "pf_rule" {
-		if st.PFRules[n] != nil {
-			st.PFRules[n] = nil
+		m := make(map[string]*PFRules)
+		for k, _ := range st.PFRules {
+			if k != n {
+				m[k] = st.PFRules[k]
+			}
 		}
 	} else {
 		return errors.New("Invalid state item type")
@@ -97,21 +113,31 @@ func (st *State) RemoveItem(t string, n string) error {
 	return nil
 }
 
-func (st *State) PrintItems(f *os.File) error {
-	for k, _ := range st.Bases {
-		fmt.Fprintf(f, "base %s\n", k)
+func (st *State) PrintItems(f *os.File, t string) error {
+	if t == "" || t == "bases" {
+		for k, _ := range st.Bases {
+			fmt.Fprintf(f, "base %s\n", k)
+		}
 	}
-	for k, _ := range st.Jails {
-		fmt.Fprintf(f, "jail %s\n", k)
+	if t == "" || t == "jails" {
+		for k, _ := range st.Jails {
+			fmt.Fprintf(f, "jail %s\n", k)
+		}
 	}
-	for k, _ := range st.Templates {
-		fmt.Fprintf(f, "template %s\n", k)
+	if t == "" || t == "templates" {
+		for k, _ := range st.Templates {
+			fmt.Fprintf(f, "template %s\n", k)
+		}
 	}
-	for k, _ := range st.NetworkInterfaces {
-		fmt.Fprintf(f, "netif %s\n", k)
+	if t == "" || t == "networkinterfaces" {
+		for k, _ := range st.NetworkInterfaces {
+			fmt.Fprintf(f, "netif %s\n", k)
+		}
 	}
-	for k, _ := range st.PFRules {
-		fmt.Fprintf(f, "pfrule %s\n", k)
+	if t == "" || t == "pfrules" {
+		for k, _ := range st.PFRules {
+			fmt.Fprintf(f, "pfrule %s\n", k)
+		}
 	}
 	return nil
 }
