@@ -243,6 +243,16 @@ func (j *Jailguard) RemoveBase(rls string) error {
 	return nil
 }
 
+func (j *Jailguard) CreateJail(f string) error {
+	cfg := NewJailConf()
+	err := cfg.ParseFile(f)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 func NewJailguard() *Jailguard {

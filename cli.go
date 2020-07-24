@@ -119,6 +119,25 @@ func (j *Jailguard) getCLIBaseListHandler() func(*cli.CLI) int {
 	return fn
 }
 
+func (j *Jailguard) getCLIJailCreateHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		err := j.CreateJail(c.Arg("file"))
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
 func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	c := cli.NewCLI("Jailguard", "Create and manage jails in FreeBSD", "Mikolaj Gasior")
 
@@ -151,6 +170,11 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	base_remove.AddArg("release", "RELEASE", "", cli.TypeString|cli.Required)
 	base_remove.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
 	base_remove.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+
+	jail_create := c.AddCmd("jail_create", "Create jail", j.getCLIJailCreateHandler())
+	jail_create.AddArg("file", "FILE.JAIL", "", cli.TypePathFile|cli.MustExist|cli.Required)
+	jail_create.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	jail_create.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
 	// jail_create -f file.jail
 	// jail_stop -n jail
