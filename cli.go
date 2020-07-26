@@ -128,7 +128,7 @@ func (j *Jailguard) getCLIJailCreateHandler() func(*cli.CLI) int {
 			j.Quiet = true
 		}
 
-		err := j.CreateJail(c.Arg("file"))
+		err := j.CreateJail(c.Arg("file"), c.Flag("base"))
 		if err != nil {
 			j.Log(LOGERR, err.Error())
 			return 2
@@ -175,30 +175,19 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	jail_create.AddArg("file", "FILE.JAIL", "", cli.TypePathFile|cli.MustExist|cli.Required)
 	jail_create.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
 	jail_create.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
-
-	// jail_create -f file.jail
-	// jail_stop -n jail
-	// jail_start -n jail
-	// jail_destroy -n jail
-
-	// network show
-
-	// template list
-	// template remove template_name
-	// template create jail_name template_name
-	// template update template_name base_name
-
-	// apply -f ???
-	// destroy -f ???
+	jail_create.AddFlag("base", "b", "", "Base to use", cli.TypeString)
 
 	// TODO queue:
-	// jail_create -> but let's make a proper check of the file + what do we do with networking etc??? - should they be flags???
 	// jail_destroy
 	// jail_stop - probably part of destroy
 	// jail_start - probably part of create
+	// tidy up:
+	//   fmt.Sprintf
 
 	// state_import for jail
 	// state_check for base and jail: checks if state is up-to-date
+
+	// networking
 
 	_ = c.AddCmd("version", "Prints version", getCLIVersionHandler(j))
 

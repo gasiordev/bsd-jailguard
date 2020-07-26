@@ -8,10 +8,10 @@ import (
 	//"io/ioutil"
 	"log"
 	"os"
-	//"os/exec"
+	"os/exec"
 	//"path/filepath"
-	//"regexp"
-	//"strings"
+	"regexp"
+	"strings"
 )
 
 const PATHDATA = "/usr/local/jailguard"
@@ -19,6 +19,7 @@ const DIRBASES = "bases"
 const DIRTEMPLATES = "templates"
 const DIRSTATE = "state"
 const DIRJAILS = "jails"
+const DIRCONFIGS = "configs"
 const DIRTMP = "tmp"
 const FILESTATE = "jailguard.jailstate"
 const NETIF = "1337"
@@ -70,12 +71,26 @@ func (j *Jailguard) Log(t int, s string) {
 	}
 }
 
+func (j *Jailguard) cmdOut(c string, a ...string) ([]byte, error) {
+	cmd := exec.Command(c, a...)
+	cmd.Stdin = os.Stdin
+	return cmd.Output()
+}
+
 func (j *Jailguard) getStateFilePath() string {
 	return PATHDATA + "/" + DIRSTATE + "/" + FILESTATE
 }
 
 func (j *Jailguard) getBaseDirPath(rls string) string {
 	return PATHDATA + "/" + DIRBASES + "/" + rls
+}
+
+func (j *Jailguard) getJailDirPath(jl string) string {
+	return PATHDATA + "/" + DIRJAILS + "/" + jl
+}
+
+func (j *Jailguard) getConfigFilePath(jl string) string {
+	return PATHDATA + "/" + DIRCONFIGS + "/" + jl + ".jail"
 }
 
 func (j *Jailguard) getState() (*State, error) {
@@ -95,6 +110,69 @@ func (j *Jailguard) getBase(rls string) *Base {
 		j.Log(t, s)
 	})
 	return bs
+}
+
+func (j *Jailguard) getJail(cfg *JailConf) *Jail {
+	jl := NewJail(cfg)
+	jl.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+	jl.ConfigFilepath = cfg.Filepath
+	jl.Dirpath = cfg.Config["path"]
+	return jl
+}
+
+func (j *Jailguard) getJailConf(f string) (*JailConf, error) {
+	cfg := NewJailConf()
+	cfg.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+	err := cfg.ParseFile(f)
+	if err != nil {
+		return nil, err
+	}
+	err = cfg.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.Config["host.hostname"] == "" {
+		cfg.Config["host.hostname"] = cfg.Name
+	}
+
+	if cfg.Config["exec.start"] == "" {
+		cfg.Config["exec.start"] = "/bin/sh /etc/rc"
+	}
+	if cfg.Config["exec.stop"] == "" {
+		cfg.Config["exec.stop"] = "/bin/sh /etc/rc.shutdown"
+	}
+
+	return cfg, nil
+}
+
+func (j *Jailguard) getOSRelease() (string, error) {
+	out, err := j.cmdOut("uname", "-m", "-r")
+	if err != nil {
+		return "", errors.New("Error getting OS release: " + err.Error())
+	}
+	a := strings.Split(string(out), " ")
+	var re = regexp.MustCompile(`-p[0-9]+$`)
+	return strings.TrimSpace(re.ReplaceAllString(a[0], "")), nil
+}
+
+func (j *Jailguard) jailExistsInOS(n string) (bool, error) {
+	j.Log(LOGDBG, "Checking if jail "+n+" is running with jls")
+	out, err := j.cmdOut("jls", "-Nn")
+	if err != nil {
+		return false, errors.New("Error running jls to check if jail is running: " + err.Error())
+	}
+
+	re := regexp.MustCompile("name=" + n + " ")
+	if re.Match([]byte(string(out))) {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -243,9 +321,84 @@ func (j *Jailguard) RemoveBase(rls string) error {
 	return nil
 }
 
-func (j *Jailguard) CreateJail(f string) error {
-	cfg := NewJailConf()
-	err := cfg.ParseFile(f)
+func (j *Jailguard) CreateJail(f string, rls string) error {
+	st, err := j.getState()
+	if err != nil {
+		return err
+	}
+
+	cfg, err := j.getJailConf(f)
+	if err != nil {
+		return err
+	}
+
+	jl, err := st.GetJail(cfg.Name)
+	if err != nil {
+		return err
+	}
+	if jl != nil {
+		return errors.New("Jail " + cfg.Name + " already exists in state file")
+	}
+
+	ex, err := j.jailExistsInOS(cfg.Name)
+	if err != nil {
+		return errors.New("Error checking if jail already exists in the system")
+	}
+	if ex {
+		return errors.New("Jail " + cfg.Name + " already exists in the system")
+	}
+
+	if cfg.Config["path"] == "" {
+		if rls == "" {
+			j.Log(LOGDBG, "Getting OS release as base")
+			rls, err = j.getOSRelease()
+			if err != nil {
+				return errors.New("Error getting OS release")
+			}
+		}
+
+		j.Log(LOGDBG, "Checking if base "+rls+" exists")
+		bs, err := st.GetBase(rls)
+		if err != nil {
+			return err
+		}
+		if bs == nil {
+			return errors.New("Base " + rls + " not found in state file")
+		}
+
+		bs.SetLogger(func(t int, s string) {
+			j.Log(t, s)
+		})
+
+		err = bs.CreateJailSource(j.getJailDirPath(cfg.Name))
+		if err != nil {
+			return errors.New("Error creating jail directory")
+		}
+		cfg.Config["path"] = j.getJailDirPath(cfg.Name)
+	} else {
+		if rls != "" {
+			j.Log(LOGINF, "path is provided in the file so base flag will be ignored")
+		}
+	}
+
+	j.Log(LOGDBG, "Writing jail config to a file")
+
+	err = cfg.WriteToFile(j.getConfigFilePath(cfg.Name))
+	if err != nil {
+		return errors.New("Error creating config file")
+	}
+
+	jl = j.getJail(cfg)
+	j.Log(LOGDBG, "Creating jail")
+	err = jl.Create()
+	if err != nil {
+		return errors.New("Error creating jail")
+	}
+
+	st.AddJail(cfg.Name, jl)
+
+	j.Log(LOGINF, "Saving state file")
+	err = st.Save()
 	if err != nil {
 		return err
 	}

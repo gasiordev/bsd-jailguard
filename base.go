@@ -123,6 +123,33 @@ func (bs *Base) Remove() error {
 	return nil
 }
 
+func (bs *Base) CreateJailSource(p string) error {
+	bs.logger(LOGDBG, "Checking if "+p+" exists")
+	_, err := os.Stat(p)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.New("Error with checking dir " + p + ": " + err.Error())
+	}
+	if err == nil {
+		return errors.New("Jail dir of " + p + " already exists")
+	}
+
+	bs.logger(LOGDBG, "Creating dir "+p)
+	err = os.MkdirAll(p, os.ModePerm)
+	if err != nil {
+		bs.logger(LOGERR, "Error with creating "+p+" dir")
+		return err
+	}
+
+	bs.logger(LOGDBG, "Running tar to extract "+bs.Dirpath+"/base.txz to "+p)
+	_, err = bs.cmdOut("tar", "-xvf", bs.Dirpath+"/base.txz", "-C", p)
+	if err != nil {
+		return errors.New("Error extracting base.txz")
+	}
+
+	bs.logger(LOGDBG, "Jail source in "+p+" has been created")
+	return nil
+}
+
 func NewBase(rls string, dir string) *Base {
 	bs := &Base{}
 	bs.SetDefaultValues()

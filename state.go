@@ -53,11 +53,28 @@ func (st *State) GetBase(rls string) (*Base, error) {
 	return st.Bases[rls], nil
 }
 
+func (st *State) GetJail(jl string) (*Jail, error) {
+	if st.Jails == nil {
+		return nil, nil
+	}
+	if st.Jails[jl] == nil {
+		return nil, nil
+	}
+	return st.Jails[jl], nil
+}
+
 func (st *State) AddBase(rls string, bs *Base) {
 	if st.Bases == nil {
 		st.Bases = make(map[string]*Base)
 	}
 	st.Bases[rls] = bs
+}
+
+func (st *State) AddJail(n string, jl *Jail) {
+	if st.Jails == nil {
+		st.Jails = make(map[string]*Jail)
+	}
+	st.Jails[n] = jl
 }
 
 func (st *State) RemoveItem(t string, n string) error {
@@ -80,6 +97,7 @@ func (st *State) RemoveItem(t string, n string) error {
 				m[k] = st.Templates[k]
 			}
 		}
+		st.Templates = m
 	} else if t == "jail" {
 		m := make(map[string]*Jail)
 		for k, _ := range st.Jails {
@@ -87,6 +105,7 @@ func (st *State) RemoveItem(t string, n string) error {
 				m[k] = st.Jails[k]
 			}
 		}
+		st.Jails = m
 	} else if t == "network_interface" {
 		m := make(map[string]*NetworkInterface)
 		for k, _ := range st.NetworkInterfaces {
@@ -94,6 +113,7 @@ func (st *State) RemoveItem(t string, n string) error {
 				m[k] = st.NetworkInterfaces[k]
 			}
 		}
+		st.NetworkInterfaces = m
 	} else if t == "pf_rule" {
 		m := make(map[string]*PFRules)
 		for k, _ := range st.PFRules {
@@ -101,6 +121,7 @@ func (st *State) RemoveItem(t string, n string) error {
 				m[k] = st.PFRules[k]
 			}
 		}
+		st.PFRules = m
 	} else {
 		return errors.New("Invalid state item type")
 	}
