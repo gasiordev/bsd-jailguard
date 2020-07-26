@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"time"
@@ -26,6 +27,45 @@ func (bs *Base) cmdOut(c string, a ...string) ([]byte, error) {
 	return cmd.Output()
 }
 
+func (bs *Base) statWithLog(p string) (os.FileInfo, bool, error) {
+	bs.logger(LOGDBG, fmt.Sprintf("Getting stat for path %s...", p))
+	st, err := os.Stat(p)
+	if err != nil {
+		if os.IsNotExist(err) {
+			bs.logger(LOGDBG, fmt.Sprintf("Path %s does not exist", p))
+		} else {
+			bs.logger(LOGDBG, fmt.Sprintf("Error has occurred when getting stat for path %s: %s", p, err.Error()))
+		}
+		return st, false, err
+	} else {
+		bs.logger(LOGDBG, fmt.Sprintf("Found path %s", p))
+		if st.IsDir() {
+			bs.logger(LOGDBG, fmt.Sprintf("Path %s is a directory", p))
+			return st, true, nil
+		}
+	}
+	return st, false, nil
+}
+
+func (bs *Base) removeAllWithLog(p string) error {
+	bs.logger(LOGDBG, fmt.Sprintf("Removing %s...", p))
+	err := os.RemoveAll(p)
+	if err != nil {
+		bs.logger(LOGDBG, fmt.Sprintf("Error has occurred when removing %s: %s", p, err.Error()))
+	}
+	bs.logger(LOGDBG, fmt.Sprintf("Path %s has been removed", p))
+	return err
+}
+
+func (bs *Base) createDirWithLog(p string) error {
+	bs.logger(LOGDBG, fmt.Sprintf("Creating directory %s...", p))
+	err := os.MkdirAll(p, os.ModePerm)
+	if err != nil {
+		bs.logger(LOGDBG, fmt.Sprintf("Error has occurred when creating %s: %s", p, err.Error()))
+	}
+	bs.logger(LOGDBG, fmt.Sprintf("Directory %s has been created", p))
+	return err
+}
 func (bs *Base) getCurrentDateTime() string {
 	return time.Now().String()
 }
@@ -39,114 +79,94 @@ func (bs *Base) SetDefaultValues() {
 }
 
 func (bs *Base) Download(ow bool) error {
-	bs.logger(LOGDBG, "Checking if "+bs.Dirpath+" exists")
-	_, err := os.Stat(bs.Dirpath)
+	_, _, err := bs.statWithLog(bs.Dirpath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			bs.logger(LOGDBG, bs.Dirpath+" does not exist, trying to create it")
-			err2 := os.MkdirAll(bs.Dirpath, os.ModePerm)
+			bs.logger(LOGDBG, "Jail directory does not exist and it has to be created")
+			err2 := bs.createDirWithLog(bs.Dirpath)
 			if err2 != nil {
-				bs.logger(LOGERR, "Error with creating "+bs.Dirpath+" dir")
 				return err2
 			}
 		} else {
-			bs.logger(LOGDBG, "Error with checking dir "+bs.Dirpath+" existance: "+err.Error())
-			return err
+			return errors.New("Error has occurred when downloading base")
 		}
 	} else {
 		if !ow {
-			bs.logger(LOGERR, "Base "+bs.Release+" exists already. Use 'overwrite' flag to remove it and download again")
-			return errors.New("Base " + bs.Release + " already exists. Use 'overwrite' flag to remove it and download again")
+			return errors.New(fmt.Sprintf("Base %s already exists. Use 'overwrite' flag to remove it and download again", bs.Release))
 		} else {
-			bs.logger(LOGDBG, "Base "+bs.Release+" already exists but 'overwrite' flag was provided so trying to remove the directory")
-			err2 := os.RemoveAll(bs.Dirpath)
+			bs.logger(LOGDBG, fmt.Sprintf("Base %s already exists but 'overwrite' flag was provided so it will be re-created", bs.Release))
+			err2 := bs.removeAllWithLog(bs.Dirpath)
 			if err2 != nil {
-				bs.logger(LOGERR, "Error removing dir "+bs.Dirpath+". Please remove the directory manually and remove the state")
-				return errors.New("Error removing base dir")
+				return errors.New("Error has occurred when removing existing base")
 			}
 
-			bs.logger(LOGDBG, "Creating directory "+bs.Dirpath)
-			err2 = os.MkdirAll(bs.Dirpath, os.ModePerm)
+			err2 = bs.createDirWithLog(bs.Dirpath)
 			if err2 != nil {
-				bs.logger(LOGERR, "Error with creating "+bs.Dirpath+" dir")
-				return err2
+				return errors.New("Error has occurred when creating new directory for base")
 			}
-
 		}
 	}
 
 	url := "http://ftp.freebsd.org/pub/FreeBSD/releases/amd64/" + bs.Release + "/base.txz"
-	bs.logger(LOGDBG, "Trying to download base.txz from "+url+" using fetch")
+	bs.logger(LOGDBG, "Trying to download base.txz from "+url+" using fetch...")
 	_, err = bs.cmdOut("fetch", url, "-o", bs.Dirpath+"/base.txz")
 	if err != nil {
-		return errors.New("Error downloading base.txz from " + url)
+		return errors.New(fmt.Sprintf("Error has occurred when downloading base.txz from %s: %s", url, err))
 	}
+	bs.logger(LOGDBG, fmt.Sprintf("File %s has been successfully saved in %s/base.txz", url, bs.Dirpath))
 
 	bs.LastUpdated = bs.getCurrentDateTime()
 	return nil
 }
 
 func (bs *Base) Import() error {
-	bs.logger(LOGDBG, "Checking if "+bs.Dirpath+"/base.txz exists")
-	_, err := os.Stat(bs.Dirpath + "/base.txz")
+	_, _, err := bs.statWithLog(bs.Dirpath + "/base.txz")
 	if err != nil {
 		if os.IsNotExist(err) {
-			return errors.New("Base file " + bs.Dirpath + "/base.txz does not exist")
+			return errors.New("Base file (base.txz) has not been found")
 		} else {
-			bs.logger(LOGDBG, "Error with checking "+bs.Dirpath+"/base.txz existance: "+err.Error())
+			return errors.New("Error has occurred when importing base")
 		}
 	}
-	bs.logger(LOGDBG, "Base source exist so it can be imported")
+	bs.logger(LOGDBG, "Base source exists and it can be imported")
 	return nil
 }
 
 func (bs *Base) Remove() error {
-	bs.logger(LOGDBG, "Checking if "+bs.Dirpath+" exists")
-	_, err := os.Stat(bs.Dirpath)
+	_, _, err := bs.statWithLog(bs.Dirpath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			bs.logger(LOGDBG, bs.Dirpath+"does not exist. Nothing to remove")
+			bs.logger(LOGDBG, "Nothing to remove")
 			return nil
 		} else {
-			bs.logger(LOGDBG, "Error with checking dir "+bs.Dirpath+" existance: "+err.Error())
 			return err
 		}
 	}
 
-	err = os.RemoveAll(bs.Dirpath)
-	if err != nil {
-		bs.logger(LOGERR, "Error removing dir "+bs.Dirpath+". Please remove the directory manually and remove the state")
-		return errors.New("Error removing base dir")
-	}
-	bs.logger(LOGDBG, bs.Dirpath+"has been removed")
-
-	return nil
+	return bs.removeAllWithLog(bs.Dirpath)
 }
 
 func (bs *Base) CreateJailSource(p string) error {
-	bs.logger(LOGDBG, "Checking if "+p+" exists")
-	_, err := os.Stat(p)
+	_, _, err := bs.statWithLog(p)
 	if err != nil && !os.IsNotExist(err) {
-		return errors.New("Error with checking dir " + p + ": " + err.Error())
+		return errors.New("Error has occurred when creating jail directory")
 	}
 	if err == nil {
-		return errors.New("Jail dir of " + p + " already exists")
+		return errors.New("Jail directory already exists")
 	}
 
-	bs.logger(LOGDBG, "Creating dir "+p)
-	err = os.MkdirAll(p, os.ModePerm)
+	err = bs.createDirWithLog(p)
 	if err != nil {
-		bs.logger(LOGERR, "Error with creating "+p+" dir")
 		return err
 	}
 
-	bs.logger(LOGDBG, "Running tar to extract "+bs.Dirpath+"/base.txz to "+p)
+	bs.logger(LOGDBG, fmt.Sprintf("Running tar to extract %s/base.txz to %s...", bs.Dirpath, p))
 	_, err = bs.cmdOut("tar", "-xvf", bs.Dirpath+"/base.txz", "-C", p)
 	if err != nil {
-		return errors.New("Error extracting base.txz")
+		return errors.New("Error has occurred when extracting base.txz")
 	}
 
-	bs.logger(LOGDBG, "Jail source in "+p+" has been created")
+	bs.logger(LOGDBG, fmt.Sprintf("Jail source directory %s has been successfully created", p))
 	return nil
 }
 

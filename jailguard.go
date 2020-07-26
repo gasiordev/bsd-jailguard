@@ -219,7 +219,7 @@ func (j *Jailguard) ImportStateItem(t string, n string) error {
 		return errors.New("Invalid item type")
 	}
 
-	j.Log(LOGINF, "Saving state file")
+	j.Log(LOGDBG, "Saving state file")
 	err = st.Save()
 	if err != nil {
 		return err
@@ -276,7 +276,7 @@ func (j *Jailguard) DownloadBase(rls string, ow bool) error {
 		}
 	}
 
-	j.Log(LOGINF, "Saving state file")
+	j.Log(LOGDBG, "Saving state file")
 	err = st.Save()
 	if err != nil {
 		return err
@@ -312,13 +312,60 @@ func (j *Jailguard) RemoveBase(rls string) error {
 
 	st.RemoveItem("base", rls)
 
-	j.Log(LOGINF, "Saving state file")
+	j.Log(LOGDBG, "Saving state file")
 	err = st.Save()
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (j *Jailguard) DestroyJail(n string) error {
+	st, err := j.getState()
+	if err != nil {
+		return err
+	}
+
+	jl, err := st.GetJail(n)
+	if err != nil {
+		return err
+	}
+
+	if jl == nil {
+		j.Log(LOGDBG, "Jail "+n+" does not exist in state file")
+
+		ex, err := j.jailExistsInOS(n)
+		if err != nil {
+			return err
+		}
+		if ex {
+			j.Log(LOGDBG, "There is a jail "+n+" running in the system")
+			return errors.New("Jail does not exist in state file but there is a jail with same name running in the system. Remove it manually or import the state of it")
+		}
+		return nil
+	}
+
+	jl.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+
+	j.Log(LOGDBG, "Destroy jail")
+	err = jl.Destroy()
+	if err != nil {
+		return errors.New("Error destroying jail")
+	}
+
+	st.RemoveItem("jail", n)
+
+	j.Log(LOGDBG, "Saving state file")
+	err = st.Save()
+	if err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 func (j *Jailguard) CreateJail(f string, rls string) error {
@@ -397,7 +444,7 @@ func (j *Jailguard) CreateJail(f string, rls string) error {
 
 	st.AddJail(cfg.Name, jl)
 
-	j.Log(LOGINF, "Saving state file")
+	j.Log(LOGDBG, "Saving state file")
 	err = st.Save()
 	if err != nil {
 		return err

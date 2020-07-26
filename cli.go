@@ -138,6 +138,25 @@ func (j *Jailguard) getCLIJailCreateHandler() func(*cli.CLI) int {
 	return fn
 }
 
+func (j *Jailguard) getCLIJailDestroyHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		err := j.DestroyJail(c.Arg("jail"))
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
 func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	c := cli.NewCLI("Jailguard", "Create and manage jails in FreeBSD", "Mikolaj Gasior")
 
@@ -176,6 +195,11 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	jail_create.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
 	jail_create.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 	jail_create.AddFlag("base", "b", "", "Base to use", cli.TypeString)
+
+	jail_destroy := c.AddCmd("jail_destroy", "Destroy jail entirely", j.getCLIJailDestroyHandler())
+	jail_destroy.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
+	jail_destroy.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	jail_destroy.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
 	// TODO queue:
 	// jail_destroy
