@@ -53,7 +53,7 @@ func (jc *JailConf) getScanner(f string) (*scanner.Scanner, error) {
 }
 
 func (jc *JailConf) ParseFile(f string) error {
-	jc.logger(LOGDBG, "Opening "+f+" to parse")
+	jc.logger(LOGDBG, fmt.Sprintf("Opening %s to parse...", f))
 	s, err := jc.getScanner(f)
 	if err != nil {
 		return err
@@ -124,38 +124,38 @@ func (jc *JailConf) ParseFile(f string) error {
 		prevToken = s.TokenText()
 		i++
 	}
-	jc.logger(LOGDBG, "File successfully parsed")
+	jc.logger(LOGDBG, fmt.Sprintf("File %s has been successfully parsed", f))
 
 	return nil
 }
 
 func (jc *JailConf) Validate() error {
-	jc.logger(LOGDBG, "Checking if key-value in config are valid")
+	jc.logger(LOGDBG, "Checking if key-value pairs in config are valid...")
 	for k, v := range jc.Config {
 		err := jc.isKeyValValid(k, v)
 		if err != nil {
 			return err
 		}
 	}
-	jc.logger(LOGDBG, "Checking for required values in jail config")
+	jc.logger(LOGDBG, "Checking for required values in config...")
 
 	// If path is not empty then exec.start and exec.stop are necessary
 	if jc.Config["path"] != "" {
-		jc.logger(LOGDBG, "Checking if path leads to an existing directory")
-		stat, err := os.Stat(jc.Config["path"])
+		jc.logger(LOGDBG, "Checking if 'path' leads to an existing directory...")
+		stat, _, err := StatWithLog(jc.Config["path"], jc.logger)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return errors.New("path is invalid")
+				return errors.New("'path' is invalid")
 			} else {
-				return errors.New("Error checking for path existance")
+				return errors.New("Error has occurred when checking for 'path' existance")
 			}
 		} else if !stat.IsDir() {
-			return errors.New("path is not a directory")
+			return errors.New("'path' is not a directory")
 		}
 
 		for _, k := range []string{"exec.start", "exec.stop"} {
 			if jc.Config[k] == "" {
-				return errors.New(k + " is missing")
+				return errors.New(fmt.Sprintf("'%s' is missing!", k))
 			}
 		}
 	}
@@ -165,25 +165,22 @@ func (jc *JailConf) Validate() error {
 
 func (jc *JailConf) WriteToFile(p string) error {
 	jc.Filepath = p
-
 	d := filepath.Dir(jc.Filepath)
-	jc.logger(LOGDBG, "Checking if "+d+" exists and is dir")
-	stat, err := os.Stat(d)
+
+	stat, _, err := StatWithLog(d, jc.logger)
 	if err != nil {
 		if os.IsNotExist(err) {
-			jc.logger(LOGDBG, d+" does not exist, trying to create it")
-			err2 := os.MkdirAll(d, os.ModePerm)
+			jc.logger(LOGDBG, fmt.Sprintf("%s does not exist and it has to be created", d))
+			err2 := CreateDirWithLog(d, jc.logger)
 			if err2 != nil {
-				jc.logger(LOGDBG, "Error with creating "+d+" dir")
 				return err2
 			}
 		} else {
-			jc.logger(LOGDBG, "Error with checking dir "+d+" existance: "+err.Error())
+			jc.logger(LOGDBG, "Error has occurred when writing config to a file")
 			return err
 		}
 	} else if !stat.IsDir() {
-		jc.logger(LOGDBG, "Configs dir "+d+" exists but it is not a dir")
-		return errors.New("Path for config dir is not a dir")
+		return errors.New("Error has occurred when writing config to a file")
 	}
 
 	o := jc.Name + " {\n"
@@ -200,11 +197,13 @@ func (jc *JailConf) WriteToFile(p string) error {
 	}
 	o = o + "}\n"
 
-	jc.logger(LOGDBG, "Writing jail config to "+jc.Filepath)
+	jc.logger(LOGDBG, fmt.Sprintf("Writing jail config..."))
 	err = ioutil.WriteFile(jc.Filepath, []byte(o), 0644)
 	if err != nil {
 		return err
 	}
+	jc.logger(LOGDBG, "Config has been written to a file")
+
 	return nil
 }
 

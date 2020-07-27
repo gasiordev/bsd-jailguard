@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"regexp"
 	"time"
 )
@@ -31,23 +30,11 @@ func (jl *Jail) getCurrentDateTime() string {
 	return time.Now().String()
 }
 
-func (jl *Jail) cmdOut(c string, a ...string) ([]byte, error) {
-	cmd := exec.Command(c, a...)
-	cmd.Stdin = os.Stdin
-	return cmd.Output()
-}
-
-func (jl *Jail) cmdRun(c string, a ...string) error {
-	cmd := exec.Command(c, a...)
-	cmd.Stdin = os.Stdin
-	return cmd.Run()
-}
-
 func (jl *Jail) existsInOS() (bool, error) {
-	jl.logger(LOGDBG, "Checking if jail "+jl.Name+" is running with jls")
-	out, err := jl.cmdOut("jls", "-Nn")
+	jl.logger(LOGDBG, fmt.Sprintf("Running 'jls' to check if jail %s is running...", jl.Name))
+	out, err := CmdOut("jls", "-Nn")
 	if err != nil {
-		return false, errors.New("Error running jls to check if jail is running: " + err.Error())
+		return false, errors.New("Error has occurred when checking if jail is running: " + err.Error())
 	}
 
 	re := regexp.MustCompile("name=" + jl.Name + " ")
@@ -63,11 +50,10 @@ func (jl *Jail) SetDefaultValues() {
 }
 
 func (jl *Jail) Create() error {
-	jl.logger(LOGDBG, fmt.Sprintf("Running jail -c -f %s", jl.ConfigFilepath))
-
-	err := jl.cmdRun("jail", "-c", "-f", jl.ConfigFilepath)
+	jl.logger(LOGDBG, fmt.Sprintf("Running 'jail -c -f %s' command to create jail...", jl.ConfigFilepath))
+	err := CmdRun("jail", "-c", "-f", jl.ConfigFilepath)
 	if err != nil {
-		return errors.New(fmt.Sprintf("Error executing jail command: %s", err.Error()))
+		return errors.New(fmt.Sprintf("Error executing 'jail' command: %s", err.Error()))
 	}
 	return nil
 }
@@ -79,37 +65,34 @@ func (jl *Jail) Destroy() error {
 	}
 	if ex {
 		jl.logger(LOGDBG, fmt.Sprintf("Jail %s exists in the system", jl.Name))
-		jl.logger(LOGDBG, fmt.Sprintf("Running jail -r %s", jl.Name))
-		err := jl.cmdRun("jail", "-r", jl.Name)
+		jl.logger(LOGDBG, fmt.Sprintf("Running 'jail -r %s' command to remove jail", jl.Name))
+		err := CmdRun("jail", "-r", jl.Name)
 		if err != nil {
-			return errors.New(fmt.Sprintf("Error executing jail command to remove: %s", err.Error()))
+			return errors.New(fmt.Sprintf("Error executing 'jail' command: %s", err.Error()))
 		}
 	}
 
-	jl.logger(LOGDBG, "Checking if "+jl.Dirpath+" exists")
-	_, err = os.Stat(jl.Dirpath)
+	_, _, err = StatWithLog(jl.Dirpath, jl.logger)
 	if err != nil {
 		if os.IsNotExist(err) {
-			jl.logger(LOGDBG, jl.Dirpath+"does not exist. Nothing to remove")
+			jl.logger(LOGDBG, "Jail directory does not exist. Nothing to remove")
 			return nil
 		} else {
-			jl.logger(LOGDBG, "Error with checking dir "+jl.Dirpath+" existance: "+err.Error())
+			jl.logger(LOGDBG, "Error has occurred when checking jail directory")
 			return err
 		}
 	}
 
-	jl.logger(LOGDBG, fmt.Sprintf("Running chflags -R noschg on %s directory", jl.Dirpath))
-	err = jl.cmdRun("chflags", "-R", "noschg", jl.Dirpath)
+	jl.logger(LOGDBG, fmt.Sprintf("Running 'chflags -R noschg' on %s directory...", jl.Dirpath))
+	err = CmdRun("chflags", "-R", "noschg", jl.Dirpath)
 	if err != nil {
 		return errors.New("Error running chflags -R noschg")
 	}
 
-	err = os.RemoveAll(jl.Dirpath)
+	err = RemoveAllWithLog(jl.Dirpath, jl.logger)
 	if err != nil {
-		jl.logger(LOGERR, "Error removing dir "+jl.Dirpath+". Please remove the directory manually and remove the state")
-		return errors.New("Error removing jail dir")
+		return errors.New("Error removing jail directory. Please remove the directory manually and remove the state")
 	}
-	jl.logger(LOGDBG, jl.Dirpath+"has been removed")
 
 	return nil
 }
