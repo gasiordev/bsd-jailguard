@@ -202,11 +202,8 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	jail_destroy.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
 	// TODO queue:
-	// jail_destroy
 	// jail_stop - probably part of destroy
 	// jail_start - probably part of create
-	// tidy up:
-	//   fmt.Sprintf
 
 	// state_import for jail
 	// state_check for base and jail: checks if state is up-to-date

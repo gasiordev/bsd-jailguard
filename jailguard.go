@@ -183,7 +183,6 @@ func (j *Jailguard) ImportStateItem(t string, n string) error {
 	}
 
 	if t == "base" {
-		j.Log(LOGDBG, fmt.Sprintf("Checking if base %s already exists in the state file...", n))
 		bs, err := st.GetBase(n)
 		if err != nil {
 			return err
@@ -204,7 +203,6 @@ func (j *Jailguard) ImportStateItem(t string, n string) error {
 		return errors.New("Invalid item type")
 	}
 
-	j.Log(LOGDBG, "Saving state file...")
 	err = st.Save()
 	if err != nil {
 		return err
@@ -231,13 +229,11 @@ func (j *Jailguard) DownloadBase(rls string, ow bool) error {
 		return err
 	}
 
-	j.Log(LOGDBG, fmt.Sprintf("Checking for base %s in state file...", rls))
 	bs, err := st.GetBase(rls)
 	if err != nil {
 		return err
 	}
 	if bs == nil {
-		j.Log(LOGDBG, fmt.Sprintf("Base %s not found in state file", rls))
 		bs = j.getBase(rls)
 		err = bs.Download(ow)
 		if err != nil {
@@ -261,7 +257,6 @@ func (j *Jailguard) DownloadBase(rls string, ow bool) error {
 		}
 	}
 
-	j.Log(LOGDBG, "Saving state file...")
 	err = st.Save()
 	if err != nil {
 		return err
@@ -276,20 +271,17 @@ func (j *Jailguard) RemoveBase(rls string) error {
 		return err
 	}
 
-	j.Log(LOGDBG, fmt.Sprintf("Getting base %s from the state file...", rls))
 	bs, err := st.GetBase(rls)
 	if err != nil {
 		return err
 	}
 	if bs == nil {
-		j.Log(LOGDBG, fmt.Sprintf("Base %s not found in state file", rls))
 		return nil
 	}
 	bs.SetLogger(func(t int, s string) {
 		j.Log(t, s)
 	})
 
-	j.Log(LOGDBG, fmt.Sprintf("Removing base %s...", rls))
 	err = bs.Remove()
 	if err != nil {
 		return err
@@ -297,7 +289,6 @@ func (j *Jailguard) RemoveBase(rls string) error {
 
 	st.RemoveItem("base", rls)
 
-	j.Log(LOGDBG, "Saving state file...")
 	err = st.Save()
 	if err != nil {
 		return err
@@ -318,8 +309,6 @@ func (j *Jailguard) DestroyJail(n string) error {
 	}
 
 	if jl == nil {
-		j.Log(LOGDBG, fmt.Sprintf("Jail %s does not exist in state file", n))
-
 		ex, err := JailExistsInOSWithLog(n, j.Log)
 		if err != nil {
 			return err
@@ -335,7 +324,6 @@ func (j *Jailguard) DestroyJail(n string) error {
 		j.Log(t, s)
 	})
 
-	j.Log(LOGDBG, fmt.Sprintf("Destroying jail...", n))
 	err = jl.Destroy()
 	if err != nil {
 		return errors.New("Error destroying jail")
@@ -343,7 +331,6 @@ func (j *Jailguard) DestroyJail(n string) error {
 
 	st.RemoveItem("jail", n)
 
-	j.Log(LOGDBG, "Saving state file...")
 	err = st.Save()
 	if err != nil {
 		return err
@@ -382,14 +369,12 @@ func (j *Jailguard) CreateJail(f string, rls string) error {
 
 	if cfg.Config["path"] == "" {
 		if rls == "" {
-			j.Log(LOGDBG, "Getting OS release for base...")
 			rls, err = j.getOSRelease()
 			if err != nil {
 				return errors.New("Error getting OS release")
 			}
 		}
 
-		j.Log(LOGDBG, fmt.Sprintf("Checking if base %s exists...", rls))
 		bs, err := st.GetBase(rls)
 		if err != nil {
 			return err
@@ -429,7 +414,6 @@ func (j *Jailguard) CreateJail(f string, rls string) error {
 
 	st.AddJail(cfg.Name, jl)
 
-	j.Log(LOGDBG, "Saving state file...")
 	err = st.Save()
 	if err != nil {
 		return err
