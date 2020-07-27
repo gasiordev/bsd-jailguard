@@ -44,26 +44,35 @@ func (st *State) SetDefaultValues() {
 }
 
 func (st *State) GetBase(rls string) (*Base, error) {
+	st.logger(LOGDBG, fmt.Sprintf("Getting base %s from the state...", rls))
 	if st.Bases == nil {
+		st.logger(LOGDBG, "There are not bases in the state")
 		return nil, nil
 	}
 	if st.Bases[rls] == nil {
+		st.logger(LOGDBG, fmt.Sprintf("Base %s has not been found in the state", rls))
 		return nil, nil
 	}
+	st.logger(LOGDBG, fmt.Sprintf("Base %s has been found in the state", rls))
 	return st.Bases[rls], nil
 }
 
 func (st *State) GetJail(jl string) (*Jail, error) {
+	st.logger(LOGDBG, fmt.Sprintf("Getting jail %s from the state...", jl))
 	if st.Jails == nil {
+		st.logger(LOGDBG, "There no jails in the state")
 		return nil, nil
 	}
 	if st.Jails[jl] == nil {
+		st.logger(LOGDBG, fmt.Sprintf("Jail %s has not been found in the state", jl))
 		return nil, nil
 	}
+	st.logger(LOGDBG, fmt.Sprintf("Jail %s has been found in the state", jl))
 	return st.Jails[jl], nil
 }
 
 func (st *State) AddBase(rls string, bs *Base) {
+	st.logger(LOGDBG, fmt.Sprintf("Adding base %s to the state...", rls))
 	if st.Bases == nil {
 		st.Bases = make(map[string]*Base)
 	}
@@ -71,6 +80,7 @@ func (st *State) AddBase(rls string, bs *Base) {
 }
 
 func (st *State) AddJail(n string, jl *Jail) {
+	st.logger(LOGDBG, fmt.Sprintf("Adding jail %s to the state...", n))
 	if st.Jails == nil {
 		st.Jails = make(map[string]*Jail)
 	}
@@ -82,6 +92,7 @@ func (st *State) RemoveItem(t string, n string) error {
 		return errors.New("Invalid name")
 	}
 
+	st.logger(LOGDBG, fmt.Sprintf("Removing item %s %s from the state...", t, n))
 	if t == "base" {
 		m := make(map[string]*Base)
 		for k, _ := range st.Bases {
@@ -130,11 +141,12 @@ func (st *State) RemoveItem(t string, n string) error {
 	if err != nil {
 		return errors.New("Cannot save state to a file")
 	}
-
+	st.logger(LOGDBG, fmt.Sprintf("Item %s %s has been removed from the state", t, n))
 	return nil
 }
 
 func (st *State) PrintItems(f *os.File, t string) error {
+	st.logger(LOGDBG, "Printing out state items...")
 	if t == "" || t == "bases" {
 		for k, _ := range st.Bases {
 			fmt.Fprintf(f, "base %s\n", k)
@@ -164,6 +176,7 @@ func (st *State) PrintItems(f *os.File, t string) error {
 }
 
 func (st *State) Save() error {
+	st.logger(LOGDBG, "Preparing the state to be saved into the file...")
 	st.SetDefaultValues()
 	st.LastUpdated = st.getCurrentDateTime()
 	if st.Created == "" {
@@ -185,39 +198,36 @@ func (st *State) Save() error {
 		st.PFRules = make(map[string]*PFRules)
 	}
 
-	st.logger(LOGDBG, "Generating state JSON")
+	st.logger(LOGDBG, "Generating state JSON...")
 	o, err := json.Marshal(st)
 	if err != nil {
-		st.logger(LOGDBG, "Error generating JSON: "+err.Error())
+		st.logger(LOGDBG, "Error has occurred while generating state JSON: "+err.Error())
 		return err
 	}
 
 	d := filepath.Dir(st.Filepath)
-	st.logger(LOGDBG, "Checking if "+d+" exists and is dir")
-	stat, err := os.Stat(d)
+	stat, _, err := StatWithLog(d, st.logger)
 	if err != nil {
 		if os.IsNotExist(err) {
-			st.logger(LOGDBG, d+" does not exist, trying to create it")
-			err2 := os.MkdirAll(d, os.ModePerm)
+			st.logger(LOGDBG, fmt.Sprintf("State directory %s does not exist, trying to create it...", d))
+			err2 := CreateDirWithLog(d, st.logger)
 			if err2 != nil {
-				st.logger(LOGDBG, "Error with creating "+d+" dir")
-				return err2
+				return errors.New("Error has occurred while saving the state")
 			}
 		} else {
-			st.logger(LOGDBG, "Error with checking dir "+d+" existance: "+err.Error())
-			return err
+			return errors.New("Error has occurred while saving the state")
 		}
 	} else if !stat.IsDir() {
-		st.logger(LOGDBG, "State dir "+d+" exists but it is not a dir")
-		return errors.New("Path for state dir is not a dir")
+		return errors.New("Path for state directory is not a directory")
 	}
 
-	st.logger(LOGDBG, "Writing state to "+st.Filepath)
+	st.logger(LOGDBG, fmt.Sprintf("Writing the state to %s...", st.Filepath))
 	err = ioutil.WriteFile(st.Filepath, o, 0644)
 	if err != nil {
 		return err
 	}
 
+	st.logger(LOGDBG, fmt.Sprintf("State has been successfully saved to %s", st.Filepath))
 	return nil
 }
 
@@ -228,7 +238,7 @@ func NewState(f string) (*State, error) {
 	// TODO: Check if it's a file
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return nil, errors.New("Error getting state file: " + err.Error())
+			return nil, errors.New("Error has occurred while getting state file: " + err.Error())
 		}
 		st.SetDefaultValues()
 		st.Created = st.getCurrentDateTime()
@@ -237,11 +247,11 @@ func NewState(f string) (*State, error) {
 
 	b, err := ioutil.ReadFile(f)
 	if err != nil {
-		return nil, errors.New("Error reading state file: " + err.Error())
+		return nil, errors.New("Error has occurred while reading state file: " + err.Error())
 	}
 	err = json.Unmarshal(b, st)
 	if err != nil {
-		return nil, errors.New("Error parsing state file: " + err.Error())
+		return nil, errors.New("Error has occurred while parsing state file: " + err.Error())
 	}
 
 	return st, nil
