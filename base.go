@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"time"
 )
 
 type Base struct {
@@ -19,16 +17,6 @@ type Base struct {
 	History []*HistoryEntry `json:"history"`
 
 	logger func(int, string)
-}
-
-func (bs *Base) cmdOut(c string, a ...string) ([]byte, error) {
-	cmd := exec.Command(c, a...)
-	cmd.Stdin = os.Stdin
-	return cmd.Output()
-}
-
-func (bs *Base) getCurrentDateTime() string {
-	return time.Now().String()
 }
 
 func (bs *Base) SetLogger(f func(int, string)) {
@@ -73,7 +61,7 @@ func (bs *Base) Download(ow bool) error {
 	if err != nil {
 		return errors.New("Error has occurred when downloading base")
 	}
-	bs.LastUpdated = bs.getCurrentDateTime()
+	bs.LastUpdated = GetCurrentDateTime()
 
 	return nil
 }
@@ -133,6 +121,6 @@ func NewBase(rls string, dir string) *Base {
 	bs.SetDefaultValues()
 	bs.Release = rls
 	bs.Dirpath = dir
-	bs.Created = bs.getCurrentDateTime()
+	bs.Created = GetCurrentDateTime()
 	return bs
 }

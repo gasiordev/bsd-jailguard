@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
+	"reflect"
 )
 
 type State struct {
@@ -29,10 +29,6 @@ type State struct {
 	logger func(int, string)
 }
 
-func (st *State) getCurrentDateTime() string {
-	return time.Now().String()
-}
-
 func (st *State) SetLogger(f func(int, string)) {
 	st.logger = f
 }
@@ -50,6 +46,15 @@ func (st *State) GetBase(rls string) (*Base, error) {
 		return nil, nil
 	}
 	if st.Bases[rls] == nil {
+		// If there's a "null" in the state file (so just empty base name key), we remove it
+		for _, k := range reflect.ValueOf(st.Bases).MapKeys() {
+			if k.String() == rls {
+				st.RemoveItem("base", rls)
+				st.logger(LOGDBG, fmt.Sprintf("Fixing base %s being null in the state", rls))
+				_ = st.Save()
+			}
+		}
+
 		st.logger(LOGDBG, fmt.Sprintf("Base %s has not been found in the state", rls))
 		return nil, nil
 	}
@@ -64,6 +69,15 @@ func (st *State) GetJail(jl string) (*Jail, error) {
 		return nil, nil
 	}
 	if st.Jails[jl] == nil {
+		// If there's a "null" in the state file (so just empty jail name key), we remove it
+		for _, k := range reflect.ValueOf(st.Jails).MapKeys() {
+			if k.String() == jl {
+				st.RemoveItem("jail", jl)
+				st.logger(LOGDBG, fmt.Sprintf("Fixing jail %s being null in the state", jl))
+				_ = st.Save()
+			}
+		}
+
 		st.logger(LOGDBG, fmt.Sprintf("Jail %s has not been found in the state", jl))
 		return nil, nil
 	}
@@ -153,8 +167,8 @@ func (st *State) PrintItems(f *os.File, t string) error {
 		}
 	}
 	if t == "" || t == "jails" {
-		for k, _ := range st.Jails {
-			fmt.Fprintf(f, "jail %s\n", k)
+		for k, jl := range st.Jails {
+			fmt.Fprintf(f, "jail %s %s\n", k, jl.State)
 		}
 	}
 	if t == "" || t == "templates" {
@@ -178,7 +192,11 @@ func (st *State) PrintItems(f *os.File, t string) error {
 func (st *State) Save() error {
 	st.logger(LOGDBG, "Preparing the state to be saved into the file...")
 	st.SetDefaultValues()
-	st.LastUpdated = st.getCurrentDateTime()
+	st.LastUpdated = GetCurrentDateTime()
+	if st.Created == "" {
+		st.Created = st.LastUpdated
+	}
+
 	if st.Created == "" {
 		st.Created = st.LastUpdated
 	}
@@ -241,7 +259,7 @@ func NewState(f string) (*State, error) {
 			return nil, errors.New("Error has occurred while getting state file: " + err.Error())
 		}
 		st.SetDefaultValues()
-		st.Created = st.getCurrentDateTime()
+		st.Created = GetCurrentDateTime()
 		return st, nil
 	}
 

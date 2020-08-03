@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"regexp"
-	"time"
 )
 
 type Jail struct {
@@ -18,16 +17,13 @@ type Jail struct {
 	Config         *JailConf `json:"config"`
 	ConfigFilepath string    `json:"config_filepath"`
 	Dirpath        string    `json:"dirpath"`
-	Iteration      int
+	Iteration      int       `json:"iteration"`
+	State          string    `json:"state"`
 	logger         func(int, string)
 }
 
 func (jl *Jail) SetLogger(f func(int, string)) {
 	jl.logger = f
-}
-
-func (jl *Jail) getCurrentDateTime() string {
-	return time.Now().String()
 }
 
 func (jl *Jail) existsInOS() (bool, error) {
@@ -49,59 +45,94 @@ func (jl *Jail) SetDefaultValues() {
 	jl.Iteration = 1
 }
 
-func (jl *Jail) Create() error {
-	jl.logger(LOGDBG, fmt.Sprintf("Running 'jail -c -f %s' command to create jail...", jl.ConfigFilepath))
+func (jl *Jail) Start() error {
+	jl.logger(LOGDBG, fmt.Sprintf("Running 'jail -c -f %s' command to start jail...", jl.ConfigFilepath))
 	err := CmdRun("jail", "-c", "-f", jl.ConfigFilepath)
 	if err != nil {
+		jl.State = "error_starting"
 		return errors.New(fmt.Sprintf("Error executing 'jail' command: %s", err.Error()))
 	}
+	jl.State = "started"
 	return nil
 }
 
-func (jl *Jail) Destroy() error {
-	ex, err := jl.existsInOS()
+func (jl *Jail) Stop() error {
+	jl.logger(LOGDBG, fmt.Sprintf("Running 'jail -r %s' command to stop jail", jl.Name))
+	err := CmdRun("jail", "-r", jl.Name)
 	if err != nil {
-		return err
+		jl.State = "error_stopping"
+		return errors.New(fmt.Sprintf("Error executing 'jail' command: %s", err.Error()))
 	}
-	if ex {
-		jl.logger(LOGDBG, fmt.Sprintf("Jail %s exists in the system", jl.Name))
-		jl.logger(LOGDBG, fmt.Sprintf("Running 'jail -r %s' command to remove jail", jl.Name))
-		err := CmdRun("jail", "-r", jl.Name)
-		if err != nil {
-			return errors.New(fmt.Sprintf("Error executing 'jail' command: %s", err.Error()))
-		}
+	jl.State = "stopped"
+	return nil
+}
+
+func (jl *Jail) Remove() error {
+	_, _, errDirPath := StatWithLog(jl.Dirpath, jl.logger)
+	_, _, errCfgPath := StatWithLog(jl.ConfigFilepath, jl.logger)
+
+	var errRmDirPath1 error
+	var errRmDirPath2 error
+	if errDirPath == nil {
+		jl.logger(LOGDBG, fmt.Sprintf("Running 'chflags -R noschg' on %s directory...", jl.Dirpath))
+		errRmDirPath1 = CmdRun("chflags", "-R", "noschg", jl.Dirpath)
+		errRmDirPath2 = RemoveAllWithLog(jl.Dirpath, jl.logger)
 	}
 
-	_, _, err = StatWithLog(jl.Dirpath, jl.logger)
+	var errRmCfgPath error
+	if errCfgPath == nil {
+		errRmCfgPath = RemoveAllWithLog(jl.ConfigFilepath, jl.logger)
+	}
+
+	if (errDirPath != nil && !os.IsNotExist(errDirPath)) || (errCfgPath != nil && !os.IsNotExist(errCfgPath)) || errRmDirPath1 != nil || errRmDirPath2 != nil || errRmCfgPath != nil {
+		return errors.New("Error has occurred while removing jail. Please remove the directories manually and remove the state")
+	}
+
+	return nil
+}
+
+func (jl *Jail) CleanAfterError() error {
+	_ = jl.Remove()
+	return nil
+}
+
+func (jl *Jail) Import() error {
+	_, _, err := StatWithLog(jl.Dirpath, jl.logger)
 	if err != nil {
 		if os.IsNotExist(err) {
-			jl.logger(LOGDBG, "Jail directory does not exist. Nothing to remove")
-			return nil
+			return errors.New("Jail directory has not been found")
 		} else {
-			jl.logger(LOGDBG, "Error has occurred when checking jail directory")
-			return err
+			return errors.New("Error has occurred when importing jail")
 		}
 	}
 
-	jl.logger(LOGDBG, fmt.Sprintf("Running 'chflags -R noschg' on %s directory...", jl.Dirpath))
-	err = CmdRun("chflags", "-R", "noschg", jl.Dirpath)
+	_, _, err = StatWithLog(jl.ConfigFilepath, jl.logger)
 	if err != nil {
-		return errors.New("Error running chflags -R noschg")
+		if os.IsNotExist(err) {
+			return errors.New("Jail config has not been found")
+		} else {
+			return errors.New("Error has occurred when importing jail")
+		}
 	}
 
-	err = RemoveAllWithLog(jl.Dirpath, jl.logger)
+	ex, err := JailExistsInOSWithLog(jl.Name, jl.logger)
 	if err != nil {
-		return errors.New("Error removing jail directory. Please remove the directory manually and remove the state")
+		return errors.New("Errors has occurred when importing jail")
+	}
+	if ex {
+		jl.State = "started"
 	}
 
+	jl.logger(LOGDBG, "Jail source directory and config exist and jail can be imported")
 	return nil
 }
 
-func NewJail(cfg *JailConf) *Jail {
+func NewJailFromConfig(cfg *JailConf) *Jail {
 	jl := &Jail{}
 	jl.Config = cfg
 	jl.Name = jl.Config.Name
 	jl.SetDefaultValues()
-	jl.Created = jl.getCurrentDateTime()
+	jl.Created = GetCurrentDateTime()
+	jl.State = "created"
 	return jl
 }

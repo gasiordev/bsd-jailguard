@@ -12,6 +12,7 @@ import (
 	//"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 const PATHDATA = "/usr/local/jailguard"
@@ -71,12 +72,6 @@ func (j *Jailguard) Log(t int, s string) {
 	}
 }
 
-func (j *Jailguard) cmdOut(c string, a ...string) ([]byte, error) {
-	cmd := exec.Command(c, a...)
-	cmd.Stdin = os.Stdin
-	return cmd.Output()
-}
-
 func (j *Jailguard) getStateFilePath() string {
 	return PATHDATA + "/" + DIRSTATE + "/" + FILESTATE
 }
@@ -104,7 +99,7 @@ func (j *Jailguard) getState() (*State, error) {
 	return st, nil
 }
 
-func (j *Jailguard) getBase(rls string) *Base {
+func (j *Jailguard) getNewBase(rls string) *Base {
 	bs := NewBase(rls, j.getBaseDirPath(rls))
 	bs.SetLogger(func(t int, s string) {
 		j.Log(t, s)
@@ -112,8 +107,8 @@ func (j *Jailguard) getBase(rls string) *Base {
 	return bs
 }
 
-func (j *Jailguard) getJail(cfg *JailConf) *Jail {
-	jl := NewJail(cfg)
+func (j *Jailguard) getNewJailFromConfig(cfg *JailConf) *Jail {
+	jl := NewJailFromConfig(cfg)
 	jl.SetLogger(func(t int, s string) {
 		j.Log(t, s)
 	})
@@ -160,6 +155,30 @@ func (j *Jailguard) getOSRelease() (string, error) {
 	return strings.TrimSpace(re.ReplaceAllString(a[0], "")), nil
 }
 
+func (j *Jailguard) getJailAndCheckIfExistsInOS(n string, fn func(int, string)) (*State, *Jail, bool, error) {
+	st, err := j.getState()
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	jl, err := st.GetJail(n)
+	if err != nil {
+		return st, nil, false, err
+	}
+
+	ex, err := JailExistsInOSWithLog(n, fn)
+	if err != nil {
+		return st, jl, false, err
+	}
+
+	if jl != nil {
+		jl.SetLogger(func(t int, s string) {
+			j.Log(t, s)
+		})
+	}
+	return st, jl, ex, nil
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Commands from CLI
 
@@ -192,13 +211,36 @@ func (j *Jailguard) ImportStateItem(t string, n string) error {
 			return errors.New("State item already exists")
 		}
 
-		bs = j.getBase(n)
+		bs = j.getNewBase(n)
 		j.Log(LOGDBG, fmt.Sprintf("Checking if base %s can be imported into state file...", n))
 		err = bs.Import()
 		if err != nil {
 			return err
 		}
 		st.AddBase(n, bs)
+	} else if t == "jail" {
+		jl, err := st.GetJail(n)
+		if err != nil {
+			return err
+		}
+		if jl != nil {
+			j.Log(LOGERR, fmt.Sprintf("Jail %s already exists. Remove it first before import a new one"))
+			return errors.New("State item already exists")
+		}
+
+		cfg, err := j.getJailConf(j.getConfigFilePath(n))
+		if err != nil {
+			return err
+		}
+		cfg.Filepath = j.getConfigFilePath(n)
+
+		jl = j.getNewJailFromConfig(cfg)
+		j.Log(LOGDBG, fmt.Sprintf("Checking if base %s can be imported into state file...", n))
+		err = jl.Import()
+		if err != nil {
+			return err
+		}
+		st.AddJail(n, jl)
 	} else {
 		return errors.New("Invalid item type")
 	}
@@ -234,7 +276,7 @@ func (j *Jailguard) DownloadBase(rls string, ow bool) error {
 		return err
 	}
 	if bs == nil {
-		bs = j.getBase(rls)
+		bs = j.getNewBase(rls)
 		err = bs.Download(ow)
 		if err != nil {
 			return err
@@ -297,36 +339,94 @@ func (j *Jailguard) RemoveBase(rls string) error {
 	return nil
 }
 
-func (j *Jailguard) DestroyJail(n string) error {
-	st, err := j.getState()
+func (j *Jailguard) StopJail(n string) error {
+	st, jl, ex, err := j.getJailAndCheckIfExistsInOS(n, j.Log)
 	if err != nil {
 		return err
 	}
 
-	jl, err := st.GetJail(n)
-	if err != nil {
-		return err
-	}
-
-	if jl == nil {
-		ex, err := JailExistsInOSWithLog(n, j.Log)
-		if err != nil {
-			return err
-		}
-		if ex {
-			j.Log(LOGDBG, fmt.Sprintf("There is a jail %s running in the system", n))
-			return errors.New("Jail does not exist in state file but there is a jail with same name running in the system. Remove it manually or import the state of it")
-		}
+	if !ex {
 		return nil
 	}
 
-	jl.SetLogger(func(t int, s string) {
-		j.Log(t, s)
-	})
+	if jl == nil {
+		j.Log(LOGDBG, fmt.Sprintf("There is a jail %s running in the system", n))
+		return errors.New("Jail does not exist in state file but there is a jail with same name running in the system. Stop it manually or import into the state")
+	}
 
-	err = jl.Destroy()
+	err = jl.Stop()
 	if err != nil {
-		return errors.New("Error destroying jail")
+		return errors.New("Error stopping jail")
+	}
+
+	err = st.Save()
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (j *Jailguard) StartJail(n string) error {
+	st, jl, ex, err := j.getJailAndCheckIfExistsInOS(n, j.Log)
+	if err != nil {
+		return err
+	}
+
+	if ex {
+		if jl == nil {
+			j.Log(LOGDBG, fmt.Sprintf("There is a jail %s running in the system", n))
+			return errors.New("Jail does not exist in state file but there is a jail with same name running in the system")
+		}
+		return nil
+	}
+	if jl == nil {
+		return errors.New("Jail does not exist in state file")
+	}
+
+	err = jl.Start()
+	if err != nil {
+		return errors.New("Error starting jail")
+	}
+
+	err = st.Save()
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (j *Jailguard) RemoveJail(n string, stop bool) error {
+	st, jl, ex, err := j.getJailAndCheckIfExistsInOS(n, j.Log)
+	if err != nil {
+		return err
+	}
+
+	if ex {
+		if jl == nil {
+			j.Log(LOGDBG, fmt.Sprintf("Jail %s is running in the system", n))
+			return errors.New("Jail does not exist in state file but there is a jail with same name running in the system. Remove it manually or import the state of it")
+		} else if !stop {
+			return errors.New("Please stop jail first or use --stop")
+		}
+	}
+	if jl == nil {
+		return nil
+	}
+
+	if ex && stop {
+		err = jl.Stop()
+		if err != nil {
+			return errors.New("Error stopping jail")
+		}
+	}
+
+	err = jl.Remove()
+	if err != nil {
+		return errors.New("Error removing jail")
 	}
 
 	st.RemoveItem("jail", n)
@@ -340,32 +440,25 @@ func (j *Jailguard) DestroyJail(n string) error {
 
 }
 
-func (j *Jailguard) CreateJail(f string, rls string) error {
-	st, err := j.getState()
-	if err != nil {
-		return err
-	}
-
+func (j *Jailguard) CreateJail(f string, rls string, start bool) error {
 	cfg, err := j.getJailConf(f)
 	if err != nil {
 		return err
 	}
 
-	jl, err := st.GetJail(cfg.Name)
+	st, jl, ex, err := j.getJailAndCheckIfExistsInOS(cfg.Name, j.Log)
 	if err != nil {
 		return err
 	}
 	if jl != nil {
 		return errors.New(fmt.Sprintf("Jail %s already exists in state file", cfg.Name))
 	}
-
-	ex, err := JailExistsInOSWithLog(cfg.Name, j.Log)
-	if err != nil {
-		return errors.New("Error checking if jail already exists in the system")
-	}
 	if ex {
 		return errors.New(fmt.Sprintf("Jail %s already exists in the system", cfg.Name))
 	}
+
+	var errCreateDir error
+	var errWriteCfg error
 
 	if cfg.Config["path"] == "" {
 		if rls == "" {
@@ -387,10 +480,7 @@ func (j *Jailguard) CreateJail(f string, rls string) error {
 			j.Log(t, s)
 		})
 
-		err = bs.CreateJailSource(j.getJailDirPath(cfg.Name))
-		if err != nil {
-			return errors.New("Error creating jail directory")
-		}
+		errCreateDir = bs.CreateJailSource(j.getJailDirPath(cfg.Name))
 		cfg.Config["path"] = j.getJailDirPath(cfg.Name)
 	} else {
 		if rls != "" {
@@ -399,24 +489,37 @@ func (j *Jailguard) CreateJail(f string, rls string) error {
 	}
 
 	j.Log(LOGDBG, "Writing jail config to a file...")
+	errWriteCfg = cfg.WriteToFile(j.getConfigFilePath(cfg.Name))
 
-	err = cfg.WriteToFile(j.getConfigFilePath(cfg.Name))
-	if err != nil {
-		return errors.New("Error creating config file")
+	jl = j.getNewJailFromConfig(cfg)
+	if errWriteCfg != nil || errCreateDir != nil {
+		jl.CleanAfterError()
 	}
 
-	jl = j.getJail(cfg)
-	j.Log(LOGDBG, "Creating jail")
-	err = jl.Create()
-	if err != nil {
-		return errors.New("Error creating jail")
+	if errCreateDir != nil {
+		return errors.New("Error creating jail source directory")
+	}
+	if errWriteCfg != nil {
+		return errors.New("Error creating config file")
 	}
 
 	st.AddJail(cfg.Name, jl)
 
 	err = st.Save()
 	if err != nil {
-		return err
+		return errors.New("Jail has been created but there was an error with writing state. Try to import the state of the jail using state_import")
+	}
+
+	if start {
+		j.Log(LOGDBG, "Starting jail")
+		err1 := jl.Start()
+		err2 := st.Save()
+		if err2 != nil {
+			return errors.New("Error has occurred while saving state")
+		}
+		if err1 != nil {
+			return errors.New("Error has occurred while starting jail")
+		}
 	}
 
 	return nil
@@ -512,8 +615,14 @@ func JailExistsInOSWithLog(n string, fn func(int, string)) (bool, error) {
 
 	re := regexp.MustCompile("name=" + n + " ")
 	if re.Match([]byte(string(out))) {
+		fn(LOGDBG, fmt.Sprintf("Jail %s is running (it was found in 'jls' output)", n))
 		return true, nil
 	}
 
+	fn(LOGDBG, fmt.Sprintf("Jail %s does not seem to be running", n))
 	return false, nil
+}
+
+func GetCurrentDateTime() string {
+	return time.Now().String()
 }

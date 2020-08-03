@@ -119,16 +119,9 @@ func (j *Jailguard) getCLIBaseListHandler() func(*cli.CLI) int {
 	return fn
 }
 
-func (j *Jailguard) getCLIJailCreateHandler() func(*cli.CLI) int {
+func (j *Jailguard) getCLIJailListHandler() func(*cli.CLI) int {
 	fn := func(c *cli.CLI) int {
-		if c.Flag("debug") == "true" {
-			j.Debug = true
-		}
-		if c.Flag("quiet") == "true" {
-			j.Quiet = true
-		}
-
-		err := j.CreateJail(c.Arg("file"), c.Flag("base"))
+		err := j.ListStateItems("jails")
 		if err != nil {
 			j.Log(LOGERR, err.Error())
 			return 2
@@ -138,7 +131,7 @@ func (j *Jailguard) getCLIJailCreateHandler() func(*cli.CLI) int {
 	return fn
 }
 
-func (j *Jailguard) getCLIJailDestroyHandler() func(*cli.CLI) int {
+func (j *Jailguard) getCLIJailCreateHandler() func(*cli.CLI) int {
 	fn := func(c *cli.CLI) int {
 		if c.Flag("debug") == "true" {
 			j.Debug = true
@@ -147,7 +140,72 @@ func (j *Jailguard) getCLIJailDestroyHandler() func(*cli.CLI) int {
 			j.Quiet = true
 		}
 
-		err := j.DestroyJail(c.Arg("jail"))
+		start := false
+		if c.Flag("start") == "true" {
+			start = true
+		}
+		err := j.CreateJail(c.Arg("file"), c.Flag("base"), start)
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
+func (j *Jailguard) getCLIJailRemoveHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		stop := false
+		if c.Flag("stop") == "true" {
+			stop = true
+		}
+		err := j.RemoveJail(c.Arg("jail"), stop)
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
+func (j *Jailguard) getCLIJailStopHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		err := j.StopJail(c.Arg("jail"))
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
+func (j *Jailguard) getCLIJailStartHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		err := j.StartJail(c.Arg("jail"))
 		if err != nil {
 			j.Log(LOGERR, err.Error())
 			return 2
@@ -160,7 +218,6 @@ func (j *Jailguard) getCLIJailDestroyHandler() func(*cli.CLI) int {
 func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	c := cli.NewCLI("Jailguard", "Create and manage jails in FreeBSD", "Mikolaj Gasior")
 
-	// state commands
 	_ = c.AddCmd("state_list", "Lists saved state items", j.getCLIStateListHandler())
 
 	state_remove := c.AddCmd("state_remove", "Remove item from state", j.getCLIStateRemoveHandler())
@@ -175,7 +232,6 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	state_import.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
 	state_import.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
-	// base commands
 	base_download := c.AddCmd("base_download", "Downloads FreeBSD base", j.getCLIBaseDownloadHandler())
 	// TODO: Change 'release' flag to TypeAlphanumeric once AllowHyphen gets implemented in go-cli
 	base_download.AddArg("release", "RELEASE", "", cli.TypeString|cli.Required)
@@ -190,22 +246,32 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	base_remove.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
 	base_remove.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
-	jail_create := c.AddCmd("jail_create", "Create jail", j.getCLIJailCreateHandler())
+	jail_create := c.AddCmd("jail_create", "Create jail source", j.getCLIJailCreateHandler())
 	jail_create.AddArg("file", "FILE.JAIL", "", cli.TypePathFile|cli.MustExist|cli.Required)
 	jail_create.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
 	jail_create.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 	jail_create.AddFlag("base", "b", "", "Base to use", cli.TypeString)
+	jail_create.AddFlag("start", "s", "", "Start jail after creating", cli.TypeBool)
 
-	jail_destroy := c.AddCmd("jail_destroy", "Destroy jail entirely", j.getCLIJailDestroyHandler())
-	jail_destroy.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
-	jail_destroy.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	jail_destroy.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	jail_remove := c.AddCmd("jail_remove", "Remove jail source", j.getCLIJailRemoveHandler())
+	jail_remove.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
+	jail_remove.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	jail_remove.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	jail_remove.AddFlag("stop", "s", "", "Stop if running", cli.TypeBool)
 
-	// TODO queue:
-	// jail_stop - probably part of destroy
-	// jail_start - probably part of create
+	jail_stop := c.AddCmd("jail_stop", "Stop jail", j.getCLIJailStopHandler())
+	jail_stop.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
+	jail_stop.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	jail_stop.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
-	// state_import for jail
+	jail_start := c.AddCmd("jail_start", "Start jail", j.getCLIJailStartHandler())
+	jail_start.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
+	jail_start.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	jail_start.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+
+	jail_list := c.AddCmd("jail_list", "List jails", j.getCLIJailListHandler())
+	jail_list.AddFlag("all", "a", "", "Show all", cli.TypeBool)
+
 	// state_check for base and jail: checks if state is up-to-date
 
 	// networking
