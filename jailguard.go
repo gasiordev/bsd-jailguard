@@ -107,12 +107,11 @@ func (j *Jailguard) getNewBase(rls string) *Base {
 	return bs
 }
 
-func (j *Jailguard) getNewJailFromConfig(cfg *JailConf) *Jail {
-	jl := NewJailFromConfig(cfg)
+func (j *Jailguard) getNewJail(cfg *JailConf, dir *JailDir) *Jail {
+	jl := NewJail(cfg, dir)
 	jl.SetLogger(func(t int, s string) {
 		j.Log(t, s)
 	})
-	jl.Dirpath = cfg.Config["path"]
 	return jl
 }
 
@@ -142,6 +141,14 @@ func (j *Jailguard) getJailConf(f string) (*JailConf, error) {
 	}
 
 	return cfg, nil
+}
+
+func (j *Jailguard) getJailDir(n string, d string) *JailDir {
+	dir := NewJailDir(n, d)
+	dir.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+	return dir
 }
 
 func (j *Jailguard) getOSRelease() (string, error) {
@@ -174,6 +181,16 @@ func (j *Jailguard) getJailAndCheckIfExistsInOS(n string, fn func(int, string)) 
 		jl.SetLogger(func(t int, s string) {
 			j.Log(t, s)
 		})
+		if jl.Config != nil {
+			jl.Config.SetLogger(func(t int, s string) {
+				j.Log(t, s)
+			})
+		}
+		if jl.Dir != nil {
+			jl.Dir.SetLogger(func(t int, s string) {
+				j.Log(t, s)
+			})
+		}
 	}
 	return st, jl, ex, nil
 }
@@ -233,7 +250,9 @@ func (j *Jailguard) ImportStateItem(t string, n string) error {
 		}
 		cfg.Filepath = j.getConfigFilePath(n)
 
-		jl = j.getNewJailFromConfig(cfg)
+		dir := j.getJailDir(n, j.getJailDirPath(n))
+
+		jl = j.getNewJail(cfg, dir)
 		j.Log(LOGDBG, fmt.Sprintf("Checking if base %s can be imported into state file...", n))
 		err = jl.Import()
 		if err != nil {
@@ -449,6 +468,8 @@ func (j *Jailguard) CreateJail(f string, rls string, start bool) error {
 		return err
 	}
 
+	dir := j.getJailDir(cfg.Name, j.getJailDirPath(cfg.Name))
+
 	st, jl, ex, err := j.getJailAndCheckIfExistsInOS(cfg.Name, j.Log)
 	if err != nil {
 		return err
@@ -483,7 +504,7 @@ func (j *Jailguard) CreateJail(f string, rls string, start bool) error {
 			j.Log(t, s)
 		})
 
-		errCreateDir = bs.CreateJailSource(j.getJailDirPath(cfg.Name))
+		errCreateDir = dir.CreateFromTarball(bs.GetBaseTarballPath())
 		cfg.Config["path"] = j.getJailDirPath(cfg.Name)
 	} else {
 		if rls != "" {
@@ -492,9 +513,9 @@ func (j *Jailguard) CreateJail(f string, rls string, start bool) error {
 	}
 
 	j.Log(LOGDBG, "Writing jail config to a file...")
-	errWriteCfg = cfg.WriteToFile(j.getConfigFilePath(cfg.Name))
+	errWriteCfg = cfg.Write(j.getConfigFilePath(cfg.Name))
 
-	jl = j.getNewJailFromConfig(cfg)
+	jl = j.getNewJail(cfg, dir)
 	if errWriteCfg != nil || errCreateDir != nil {
 		jl.CleanAfterError()
 	}

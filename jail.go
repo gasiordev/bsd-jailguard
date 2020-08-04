@@ -14,7 +14,7 @@ type Jail struct {
 	Created     string          `json:"created"`
 	LastUpdated string          `json:"last_updated"`
 	Config      *JailConf       `json:"config"`
-	Dirpath     string          `json:"dirpath"`
+	Dir         *JailDir        `json:"dir"`
 	Iteration   int             `json:"iteration"`
 	History     []*HistoryEntry `json:"history"`
 	State       string          `json:"state"`
@@ -83,23 +83,10 @@ func (jl *Jail) Stop() error {
 }
 
 func (jl *Jail) Remove() error {
-	_, _, errDirPath := StatWithLog(jl.Dirpath, jl.logger)
-	_, _, errCfgPath := StatWithLog(jl.Config.Filepath, jl.logger)
+	err1 := jl.Dir.Remove()
+	err2 := jl.Config.Remove()
 
-	var errRmDirPath1 error
-	var errRmDirPath2 error
-	if errDirPath == nil {
-		jl.logger(LOGDBG, fmt.Sprintf("Running 'chflags -R noschg' on %s directory...", jl.Dirpath))
-		errRmDirPath1 = CmdRun("chflags", "-R", "noschg", jl.Dirpath)
-		errRmDirPath2 = RemoveAllWithLog(jl.Dirpath, jl.logger)
-	}
-
-	var errRmCfgPath error
-	if errCfgPath == nil {
-		errRmCfgPath = RemoveAllWithLog(jl.Config.Filepath, jl.logger)
-	}
-
-	if (errDirPath != nil && !os.IsNotExist(errDirPath)) || (errCfgPath != nil && !os.IsNotExist(errCfgPath)) || errRmDirPath1 != nil || errRmDirPath2 != nil || errRmCfgPath != nil {
+	if err1 != nil || err2 != nil {
 		return errors.New("Error has occurred while removing jail. Please remove the directories manually and remove the state")
 	}
 
@@ -112,7 +99,7 @@ func (jl *Jail) CleanAfterError() error {
 }
 
 func (jl *Jail) Import() error {
-	_, _, err := StatWithLog(jl.Dirpath, jl.logger)
+	_, _, err := StatWithLog(jl.Dir.Dirpath, jl.logger)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return errors.New("Jail directory has not been found")
@@ -142,9 +129,10 @@ func (jl *Jail) Import() error {
 	return nil
 }
 
-func NewJailFromConfig(cfg *JailConf) *Jail {
+func NewJail(cfg *JailConf, d *JailDir) *Jail {
 	jl := &Jail{}
 	jl.Config = cfg
+	jl.Dir = d
 	jl.Name = jl.Config.Name
 	jl.SetDefaultValues()
 	jl.Created = GetCurrentDateTime()

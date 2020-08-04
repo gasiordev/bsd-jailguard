@@ -134,6 +134,10 @@ func (bs *Base) CreateJailSource(p string) error {
 	return nil
 }
 
+func (bs *Base) GetBaseTarballPath() string {
+	return bs.Dirpath + "/base.txz"
+}
+
 func NewBase(rls string, dir string) *Base {
 	bs := &Base{}
 	bs.SetDefaultValues()

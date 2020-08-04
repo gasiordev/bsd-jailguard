@@ -178,7 +178,7 @@ func (jc *JailConf) Validate() error {
 	return nil
 }
 
-func (jc *JailConf) WriteToFile(p string) error {
+func (jc *JailConf) Write(p string) error {
 	jc.Filepath = p
 	d := filepath.Dir(jc.Filepath)
 
@@ -220,6 +220,29 @@ func (jc *JailConf) WriteToFile(p string) error {
 		return err
 	}
 	jc.logger(LOGDBG, "Config has been written to a file")
+
+	return nil
+}
+
+func (jc *JailConf) Remove() error {
+	if jc.Filepath == "" {
+		return nil
+	}
+
+	_, _, err := StatWithLog(jc.Filepath, jc.logger)
+	if err != nil {
+		if os.IsNotExist(err) {
+			jc.logger(LOGDBG, "Nothing to remove")
+			return nil
+		} else {
+			return err
+		}
+	}
+
+	err = RemoveAllWithLog(jc.Filepath, jc.logger)
+	if err != nil {
+		return errors.New("Error has occurred while removing jail config. Please remove the file manually")
+	}
 
 	return nil
 }
