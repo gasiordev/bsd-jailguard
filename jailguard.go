@@ -112,7 +112,6 @@ func (j *Jailguard) getNewJailFromConfig(cfg *JailConf) *Jail {
 	jl.SetLogger(func(t int, s string) {
 		j.Log(t, s)
 	})
-	jl.ConfigFilepath = cfg.Filepath
 	jl.Dirpath = cfg.Config["path"]
 	return jl
 }

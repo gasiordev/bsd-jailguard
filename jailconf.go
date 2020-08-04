@@ -198,6 +198,8 @@ func (jc *JailConf) WriteToFile(p string) error {
 		return errors.New("Error has occurred when writing config to a file")
 	}
 
+	jc.Iteration++
+
 	o := jc.Name + " {\n"
 	for k, v := range jc.Config {
 		if v == "true" {

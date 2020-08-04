@@ -8,18 +8,17 @@ import (
 )
 
 type Jail struct {
-	Release        string          `json:"release"`
-	SourceURL      string          `json:"source_url"`
-	Name           string          `json:"name"`
-	Created        string          `json:"created"`
-	LastUpdated    string          `json:"last_updated"`
-	Config         *JailConf       `json:"config"`
-	ConfigFilepath string          `json:"config_filepath"`
-	Dirpath        string          `json:"dirpath"`
-	Iteration      int             `json:"iteration"`
-	History        []*HistoryEntry `json:"history"`
-	State          string          `json:"state"`
-	logger         func(int, string)
+	Release     string          `json:"release"`
+	SourceURL   string          `json:"source_url"`
+	Name        string          `json:"name"`
+	Created     string          `json:"created"`
+	LastUpdated string          `json:"last_updated"`
+	Config      *JailConf       `json:"config"`
+	Dirpath     string          `json:"dirpath"`
+	Iteration   int             `json:"iteration"`
+	History     []*HistoryEntry `json:"history"`
+	State       string          `json:"state"`
+	logger      func(int, string)
 }
 
 func (jl *Jail) SetLogger(f func(int, string)) {
@@ -54,8 +53,8 @@ func (jl *Jail) SetDefaultValues() {
 }
 
 func (jl *Jail) Start() error {
-	jl.logger(LOGDBG, fmt.Sprintf("Running 'jail -c -f %s' command to start jail...", jl.ConfigFilepath))
-	err := CmdRun("jail", "-c", "-f", jl.ConfigFilepath)
+	jl.logger(LOGDBG, fmt.Sprintf("Running 'jail -c -f %s' command to start jail...", jl.Config.Filepath))
+	err := CmdRun("jail", "-c", "-f", jl.Config.Filepath)
 	if err != nil {
 		jl.State = "error_starting"
 		return errors.New(fmt.Sprintf("Error executing 'jail' command: %s", err.Error()))
@@ -85,7 +84,7 @@ func (jl *Jail) Stop() error {
 
 func (jl *Jail) Remove() error {
 	_, _, errDirPath := StatWithLog(jl.Dirpath, jl.logger)
-	_, _, errCfgPath := StatWithLog(jl.ConfigFilepath, jl.logger)
+	_, _, errCfgPath := StatWithLog(jl.Config.Filepath, jl.logger)
 
 	var errRmDirPath1 error
 	var errRmDirPath2 error
@@ -97,7 +96,7 @@ func (jl *Jail) Remove() error {
 
 	var errRmCfgPath error
 	if errCfgPath == nil {
-		errRmCfgPath = RemoveAllWithLog(jl.ConfigFilepath, jl.logger)
+		errRmCfgPath = RemoveAllWithLog(jl.Config.Filepath, jl.logger)
 	}
 
 	if (errDirPath != nil && !os.IsNotExist(errDirPath)) || (errCfgPath != nil && !os.IsNotExist(errCfgPath)) || errRmDirPath1 != nil || errRmDirPath2 != nil || errRmCfgPath != nil {
@@ -122,7 +121,7 @@ func (jl *Jail) Import() error {
 		}
 	}
 
-	_, _, err = StatWithLog(jl.ConfigFilepath, jl.logger)
+	_, _, err = StatWithLog(jl.Config.Filepath, jl.logger)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return errors.New("Jail config has not been found")
