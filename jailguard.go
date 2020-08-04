@@ -359,6 +359,8 @@ func (j *Jailguard) StopJail(n string) error {
 		return errors.New("Error stopping jail")
 	}
 
+	st.AddHistoryEntry(fmt.Sprintf("Stop jail %s", n))
+
 	err = st.Save()
 	if err != nil {
 		return err
@@ -389,6 +391,8 @@ func (j *Jailguard) StartJail(n string) error {
 	if err != nil {
 		return errors.New("Error starting jail")
 	}
+
+	st.AddHistoryEntry(fmt.Sprintf("Start jail %s", n))
 
 	err = st.Save()
 	if err != nil {

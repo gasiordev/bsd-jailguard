@@ -27,8 +27,17 @@ func (bs *Base) SetDefaultValues() {
 	bs.Iteration = 1
 }
 
+func (bs *Base) AddHistoryEntry(s string) {
+	he := NewHistoryEntry(GetCurrentDateTime(), s)
+	if bs.History == nil {
+		bs.History = []*HistoryEntry{}
+	}
+	bs.History = append(bs.History, he)
+}
+
 func (bs *Base) Download(ow bool) error {
 	_, _, err := StatWithLog(bs.Dirpath, bs.logger)
+
 	if err != nil {
 		if os.IsNotExist(err) {
 			bs.logger(LOGDBG, "Jail directory does not exist and it has to be created")
@@ -44,6 +53,8 @@ func (bs *Base) Download(ow bool) error {
 			return errors.New(fmt.Sprintf("Base %s already exists. Use 'overwrite' flag to remove it and download again", bs.Release))
 		} else {
 			bs.logger(LOGDBG, fmt.Sprintf("Base %s already exists but 'overwrite' flag was provided so it will be re-created", bs.Release))
+			bs.Iteration++
+
 			err2 := RemoveAllWithLog(bs.Dirpath, bs.logger)
 			if err2 != nil {
 				return errors.New("Error has occurred when removing existing base")
@@ -56,12 +67,17 @@ func (bs *Base) Download(ow bool) error {
 		}
 	}
 
+	if err == nil && ow {
+		bs.AddHistoryEntry("Download again (overwrite)")
+	}
+
 	url := fmt.Sprintf("http://ftp.freebsd.org/pub/FreeBSD/releases/amd64/%s/base.txz", bs.Release)
 	err = CmdFetchWithLog(url, bs.Dirpath+"/base.txz", bs.logger)
 	if err != nil {
-		return errors.New("Error has occurred when downloading base")
+		return errors.New("Error has occurred when downloading base. Please try again or fix base manually")
 	}
 	bs.LastUpdated = GetCurrentDateTime()
+	bs.SourceURL = url
 
 	return nil
 }
@@ -112,6 +128,8 @@ func (bs *Base) CreateJailSource(p string) error {
 		return errors.New("Error has occurred when extracting base")
 	}
 	bs.logger(LOGDBG, fmt.Sprintf("Jail source directory %s has been successfully created", p))
+
+	bs.AddHistoryEntry(fmt.Sprintf("Create jail source directory %s", p))
 
 	return nil
 }

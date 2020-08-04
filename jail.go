@@ -8,22 +8,30 @@ import (
 )
 
 type Jail struct {
-	Release        string    `json:"release"`
-	SourceURL      string    `json:"source_url"`
-	SourceTemplate string    `json:"source_template"`
-	Name           string    `json:"name"`
-	Created        string    `json:"created"`
-	LastUpdated    string    `json:"last_updated"`
-	Config         *JailConf `json:"config"`
-	ConfigFilepath string    `json:"config_filepath"`
-	Dirpath        string    `json:"dirpath"`
-	Iteration      int       `json:"iteration"`
-	State          string    `json:"state"`
+	Release        string          `json:"release"`
+	SourceURL      string          `json:"source_url"`
+	Name           string          `json:"name"`
+	Created        string          `json:"created"`
+	LastUpdated    string          `json:"last_updated"`
+	Config         *JailConf       `json:"config"`
+	ConfigFilepath string          `json:"config_filepath"`
+	Dirpath        string          `json:"dirpath"`
+	Iteration      int             `json:"iteration"`
+	History        []*HistoryEntry `json:"history"`
+	State          string          `json:"state"`
 	logger         func(int, string)
 }
 
 func (jl *Jail) SetLogger(f func(int, string)) {
 	jl.logger = f
+}
+
+func (jl *Jail) AddHistoryEntry(s string) {
+	he := NewHistoryEntry(GetCurrentDateTime(), s)
+	if jl.History == nil {
+		jl.History = []*HistoryEntry{}
+	}
+	jl.History = append(jl.History, he)
 }
 
 func (jl *Jail) existsInOS() (bool, error) {
@@ -53,6 +61,10 @@ func (jl *Jail) Start() error {
 		return errors.New(fmt.Sprintf("Error executing 'jail' command: %s", err.Error()))
 	}
 	jl.State = "started"
+
+	jl.Iteration++
+	jl.AddHistoryEntry("Start")
+
 	return nil
 }
 
@@ -64,6 +76,10 @@ func (jl *Jail) Stop() error {
 		return errors.New(fmt.Sprintf("Error executing 'jail' command: %s", err.Error()))
 	}
 	jl.State = "stopped"
+
+	jl.Iteration++
+	jl.AddHistoryEntry("Stop")
+
 	return nil
 }
 

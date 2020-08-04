@@ -17,14 +17,29 @@ const CHAR_BEGIN_BLK = "{"
 const CHAR_END_BLK = "}"
 
 type JailConf struct {
-	Name     string            `json:"name"`
-	Config   map[string]string `json:"config"`
-	Filepath string            `json:"filepath"`
-	logger   func(int, string)
+	Name      string            `json:"name"`
+	Config    map[string]string `json:"config"`
+	Filepath  string            `json:"filepath"`
+	Iteration int               `json:"iteration"`
+	History   []*HistoryEntry   `json:"history"`
+
+	logger func(int, string)
 }
 
 func (jc *JailConf) SetLogger(f func(int, string)) {
 	jc.logger = f
+}
+
+func (jc *JailConf) AddHistoryEntry(s string) {
+	he := NewHistoryEntry(GetCurrentDateTime(), s)
+	if jc.History == nil {
+		jc.History = []*HistoryEntry{}
+	}
+	jc.History = append(jc.History, he)
+}
+
+func (jc *JailConf) SetDefaultValues() {
+	jc.Iteration = 1
 }
 
 func (jc *JailConf) isValidName(s string) bool {

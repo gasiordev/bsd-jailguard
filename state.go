@@ -19,7 +19,6 @@ type State struct {
 	History     []*HistoryEntry `json:"history"`
 
 	Bases             map[string]*Base             `json:"bases"`
-	Templates         map[string]*Template         `json:"templates"`
 	Jails             map[string]*Jail             `json:"jails"`
 	NetworkInterfaces map[string]*NetworkInterface `json:"network_interfaces"`
 	PFRules           map[string]*PFRules          `json:"pf_rules"`
@@ -36,7 +35,15 @@ func (st *State) SetLogger(f func(int, string)) {
 func (st *State) SetDefaultValues() {
 	st.Version = "2"
 	st.Software = "jailguard " + VERSION
-	st.Iteration = 1
+	st.Iteration++
+}
+
+func (st *State) AddHistoryEntry(s string) {
+	he := NewHistoryEntry(GetCurrentDateTime(), s)
+	if st.History == nil {
+		st.History = []*HistoryEntry{}
+	}
+	st.History = append(st.History, he)
 }
 
 func (st *State) GetBase(rls string) (*Base, error) {
@@ -91,6 +98,8 @@ func (st *State) AddBase(rls string, bs *Base) {
 		st.Bases = make(map[string]*Base)
 	}
 	st.Bases[rls] = bs
+
+	st.AddHistoryEntry(fmt.Sprintf("Add base %s", rls))
 }
 
 func (st *State) AddJail(n string, jl *Jail) {
@@ -99,6 +108,8 @@ func (st *State) AddJail(n string, jl *Jail) {
 		st.Jails = make(map[string]*Jail)
 	}
 	st.Jails[n] = jl
+
+	st.AddHistoryEntry(fmt.Sprintf("Add jail %s", n))
 }
 
 func (st *State) RemoveItem(t string, n string) error {
@@ -115,14 +126,6 @@ func (st *State) RemoveItem(t string, n string) error {
 			}
 		}
 		st.Bases = m
-	} else if t == "template" {
-		m := make(map[string]*Template)
-		for k, _ := range st.Templates {
-			if k != n {
-				m[k] = st.Templates[k]
-			}
-		}
-		st.Templates = m
 	} else if t == "jail" {
 		m := make(map[string]*Jail)
 		for k, _ := range st.Jails {
@@ -156,6 +159,9 @@ func (st *State) RemoveItem(t string, n string) error {
 		return errors.New("Cannot save state to a file")
 	}
 	st.logger(LOGDBG, fmt.Sprintf("Item %s %s has been removed from the state", t, n))
+
+	st.AddHistoryEntry(fmt.Sprintf("Remove item %s %s", t, n))
+
 	return nil
 }
 
@@ -169,11 +175,6 @@ func (st *State) PrintItems(f *os.File, t string) error {
 	if t == "" || t == "jails" {
 		for k, jl := range st.Jails {
 			fmt.Fprintf(f, "jail %s %s\n", k, jl.State)
-		}
-	}
-	if t == "" || t == "templates" {
-		for k, _ := range st.Templates {
-			fmt.Fprintf(f, "template %s\n", k)
 		}
 	}
 	if t == "" || t == "networkinterfaces" {
@@ -202,9 +203,6 @@ func (st *State) Save() error {
 	}
 	if st.Bases == nil {
 		st.Bases = make(map[string]*Base)
-	}
-	if st.Templates == nil {
-		st.Templates = make(map[string]*Template)
 	}
 	if st.Jails == nil {
 		st.Jails = make(map[string]*Jail)
@@ -238,6 +236,8 @@ func (st *State) Save() error {
 	} else if !stat.IsDir() {
 		return errors.New("Path for state directory is not a directory")
 	}
+
+	st.Iteration++
 
 	st.logger(LOGDBG, fmt.Sprintf("Writing the state to %s...", st.Filepath))
 	err = ioutil.WriteFile(st.Filepath, o, 0644)
