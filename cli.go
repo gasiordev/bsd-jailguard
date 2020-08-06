@@ -215,6 +215,113 @@ func (j *Jailguard) getCLIJailStartHandler() func(*cli.CLI) int {
 	return fn
 }
 
+func (j *Jailguard) getCLINetifListHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		err := j.ListStateItems("netifs")
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
+func (j *Jailguard) getCLINetifCreateHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		err := j.CreateNetif(c.Arg("name"), c.Arg("ip_addr_begin"), c.Arg("ip_addr_end"), c.Arg("if_name"))
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
+func (j *Jailguard) getCLINetifDestroyHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		err := j.DestroyNetif(c.Arg("name"))
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
+func (j *Jailguard) getCLINetifAliasAddHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		err := j.AddNetifAlias(c.Arg("name"), c.Arg("ip_addr"))
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
+func (j *Jailguard) getCLINetifAliasDeleteHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		err := j.DeleteNetifAlias(c.Arg("name"), c.Arg("ip_addr"))
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
+func (j *Jailguard) getCLINetifAliasListHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		err := j.ListNetifAliases(c.Arg("name"))
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
 func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	c := cli.NewCLI("Jailguard", "Create and manage jails in FreeBSD", "Mikolaj Gasior")
 
@@ -269,12 +376,66 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	jail_start.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
 	jail_start.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
-	jail_list := c.AddCmd("jail_list", "List jails", j.getCLIJailListHandler())
-	jail_list.AddFlag("all", "a", "", "Show all", cli.TypeBool)
+	_ = c.AddCmd("jail_list", "List jails", j.getCLIJailListHandler())
+
+	netif_create := c.AddCmd("netif_create", "Create network interface", j.getCLINetifCreateHandler())
+	netif_create.AddArg("name", "NAME", "", cli.TypeString|cli.Required)
+	netif_create.AddArg("ip_addr_begin", "IP_ADDR_BEGIN", "", cli.TypeString|cli.Required)
+	netif_create.AddArg("ip_addr_end", "IP_ADDR_END", "", cli.TypeString|cli.Required)
+	netif_create.AddArg("if_name", "INTERFACE_NAME", "", cli.TypeString)
+	netif_create.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	netif_create.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+
+	netif_destroy := c.AddCmd("netif_destroy", "Destroy network interface", j.getCLINetifDestroyHandler())
+	netif_destroy.AddArg("name", "NAME", "", cli.TypeString|cli.Required)
+	netif_destroy.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	netif_destroy.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+
+	_ = c.AddCmd("netif_list", "List network interfaces", j.getCLINetifListHandler())
+
+	netif_alias_add := c.AddCmd("netif_alias_add", "Add alias IP address to a network interface", j.getCLINetifAliasAddHandler())
+	netif_alias_add.AddArg("name", "NAME", "", cli.TypeString|cli.Required)
+	netif_alias_add.AddArg("ip_addr", "IP_ADDR", "", cli.TypeString|cli.Required)
+	netif_alias_add.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	netif_alias_add.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+
+	netif_alias_delete := c.AddCmd("netif_alias_delete", "Delete alias IP address from a network interface", j.getCLINetifAliasDeleteHandler())
+	netif_alias_delete.AddArg("name", "NAME", "", cli.TypeString|cli.Required)
+	netif_alias_delete.AddArg("ip_addr", "IP_ADDR", "", cli.TypeString|cli.Required)
+	netif_alias_delete.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	netif_alias_delete.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+
+	netif_alias_list := c.AddCmd("netif_alias_list", "List network interface alias IP addresses", j.getCLINetifAliasListHandler())
+	netif_alias_list.AddArg("name", "NAME", "", cli.TypeString|cli.Required)
+
+	// pf_anchor_create : name
+	// pf_anchor_remove : name
+
+	// jail_portfwd_create : name host_port jail_port
+	// jail_portfwd_remove : name [-a] host_port jail_port ---> -a removes all
+	// jail_portfwd_list : name
+
+	// jail_natpass_create : name gw_netif
+	// jail_natpass_remove : name  ---> there can be only one
+	// jail_natpass_list : name
+
+	// whenever app is started, check for the configuration - if not then write about running
+	// 'configure' or passing '--config'
+
+	// whenever app is started, check if the configuration has correct values
+
+	// config_list
+	// config_get key            ------> /etc/jailguard.conf otherwise --config for all the commands
+	// config_set key value
+	// configure - before first use, tool has to be configured - all values can be passed interactively
+	//   or as flags
+
+	// when checking the jail conf: - if interface exists and if not then it has to be created
+	//                              - if pf entries exist then pf has to be installed
+	//                                                         and pf anchor created
+	//                              - if networking then check the sysctl for allow_raw_sockets and if not present then display warning (which can be supressed by -q)
 
 	// state_check for base and jail: checks if state is up-to-date
-
-	// networking
 
 	_ = c.AddCmd("version", "Prints version", getCLIVersionHandler(j))
 

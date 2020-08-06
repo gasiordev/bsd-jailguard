@@ -1,2 +1,26 @@
 dupajail {
+  interface = lo1;
+  ip4.addr = 192.168.100.4;
+
+  # interface has to be added in the state and it is ignored when 'interface'
+  # is passed
+  jailguard.interface_name = jailguard;
+
+  # if ip4.addr is passed and it is not 'alias' on the 'interface' then by
+  # default it's added. set below to not do that.
+  jailguard.nocreate_ip4_addr;
+
+  # pf has to be installed + anchors have to be created
+
+  jailguard.pf.port_forward  = 2201:22;
+  jailguard.pf.port_forward += 8001:80;
+  jailguard.pf.nat_pass_interface = igb0;
+
+  jailguard.nameserver = "8.8.8.8";
+  jailguard.ssh_enabled;
+  jailguard.exec_pre_start_append_file  = file:script1.sh;
+  jailguard.exec_pre_start_append_file += file:script2.sh;
+  jailguard.add_user = miko:...:./miko_public_key.pub
+  jailguard.volume_mount  = ./volume1:/volume1:rw
+  jailguard.volume_mount += ./volume2:/volume2:ro
 }

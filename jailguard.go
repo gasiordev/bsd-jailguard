@@ -115,6 +115,14 @@ func (j *Jailguard) getNewJail(cfg *JailConf, dir *JailDir) *Jail {
 	return jl
 }
 
+func (j *Jailguard) getNewNetif(n string, ip_begin string, ip_end string, if_name string) *Netif {
+	ni := NewNetif(n, ip_begin, ip_end, if_name)
+	ni.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+	return ni
+}
+
 func (j *Jailguard) getJailConf(f string) (*JailConf, error) {
 	cfg := NewJailConf()
 	cfg.SetLogger(func(t int, s string) {
@@ -152,7 +160,7 @@ func (j *Jailguard) getJailDir(n string, d string) *JailDir {
 }
 
 func (j *Jailguard) getOSRelease() (string, error) {
-	out, err := CmdOut("uname", "-m", "-r")
+	out, err := CmdOut(j.Log, "uname", "-m", "-r")
 	if err != nil {
 		return "", errors.New("Error getting OS release: " + err.Error())
 	}
@@ -549,6 +557,141 @@ func (j *Jailguard) CreateJail(f string, rls string, start bool) error {
 	return nil
 }
 
+func (j *Jailguard) CreateNetif(n string, ip_begin string, ip_end string, if_n string) error {
+	st, err := j.getState()
+	if err != nil {
+		return err
+	}
+
+	ni, err := st.GetNetif(n)
+	if err != nil {
+		return err
+	}
+	if ni != nil {
+		return errors.New(fmt.Sprintf("Network interface %s already exists in the state", n))
+	}
+
+	ni = j.getNewNetif(n, ip_begin, ip_end, if_n)
+	err = ni.Create()
+	if err != nil {
+		return err
+	}
+
+	st.AddNetif(n, ni)
+
+	err = st.Save()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (j *Jailguard) DestroyNetif(n string) error {
+	st, err := j.getState()
+	if err != nil {
+		return err
+	}
+
+	ni, err := st.GetNetif(n)
+	if err != nil {
+		return err
+	}
+	if ni == nil {
+		return nil
+	}
+	ni.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+
+	err = ni.Destroy()
+	if err != nil {
+		return err
+	}
+
+	st.RemoveItem("netif", n)
+
+	err = st.Save()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (j *Jailguard) AddNetifAlias(n string, ip string) error {
+	st, err := j.getState()
+	if err != nil {
+		return err
+	}
+
+	ni, err := st.GetNetif(n)
+	if err != nil {
+		return err
+	}
+	if ni == nil {
+		return errors.New(fmt.Sprintf("Network interface %s does not exist", n))
+	}
+	ni.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+
+	_, err = ni.AddAlias(ip)
+	if err != nil {
+		return err
+	}
+
+	err = st.Save()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (j *Jailguard) DeleteNetifAlias(n string, ip string) error {
+	st, err := j.getState()
+	if err != nil {
+		return err
+	}
+
+	ni, err := st.GetNetif(n)
+	if err != nil {
+		return err
+	}
+	if ni == nil {
+		return errors.New(fmt.Sprintf("Network interface %s does not exist", n))
+	}
+	ni.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+
+	err = ni.DeleteAlias(ip)
+	if err != nil {
+		return err
+	}
+
+	err = st.Save()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (j *Jailguard) ListNetifAliases(n string) error {
+	st, err := j.getState()
+	if err != nil {
+		return err
+	}
+
+	err = st.PrintItemItems(j.cli.GetStdout(), "netif", n, "aliases")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 func NewJailguard() *Jailguard {
@@ -598,7 +741,7 @@ func CreateDirWithLog(p string, fn func(int, string)) error {
 
 func CmdFetchWithLog(url string, o string, fn func(int, string)) error {
 	fn(LOGDBG, fmt.Sprintf("Running 'fetch' to download %s to %s...", url, o))
-	_, err := CmdOut("fetch", url, "-o", o)
+	_, err := CmdOut(fn, "fetch", url, "-o", o)
 	if err != nil {
 		fn(LOGDBG, fmt.Sprintf("Error has occurred when downloading %s to %s", url, o))
 		return err
@@ -609,7 +752,7 @@ func CmdFetchWithLog(url string, o string, fn func(int, string)) error {
 
 func CmdTarExtractWithLog(f string, d string, fn func(int, string)) error {
 	fn(LOGDBG, fmt.Sprintf("Running 'tar' to extract %s to %s directory...", f, d))
-	_, err := CmdOut("tar", "-xvf", f, "-C", d)
+	_, err := CmdOut(fn, "tar", "-xvf", f, "-C", d)
 	if err != nil {
 		fn(LOGDBG, fmt.Sprintf("Error has occurred when extracting %s to %s", f, d))
 		return err
@@ -618,13 +761,15 @@ func CmdTarExtractWithLog(f string, d string, fn func(int, string)) error {
 	return nil
 }
 
-func CmdOut(c string, a ...string) ([]byte, error) {
+func CmdOut(fn func(int, string), c string, a ...string) ([]byte, error) {
+	fn(LOGDBG, fmt.Sprintf("Running command '%s %s'...", c, strings.Join(a, "")))
 	cmd := exec.Command(c, a...)
 	cmd.Stdin = os.Stdin
 	return cmd.Output()
 }
 
-func CmdRun(c string, a ...string) error {
+func CmdRun(fn func(int, string), c string, a ...string) error {
+	fn(LOGDBG, fmt.Sprintf("Running command '%s %s'...", c, strings.Join(a, "")))
 	cmd := exec.Command(c, a...)
 	cmd.Stdin = os.Stdin
 	return cmd.Run()
@@ -632,7 +777,7 @@ func CmdRun(c string, a ...string) error {
 
 func JailExistsInOSWithLog(n string, fn func(int, string)) (bool, error) {
 	fn(LOGDBG, fmt.Sprintf("Running 'jls' to check if jail %s is running...", n))
-	out, err := CmdOut("jls", "-Nn")
+	out, err := CmdOut(fn, "jls", "-Nn")
 	if err != nil {
 		return false, errors.New("Error running 'jls' to check if jail is running: " + err.Error())
 	}

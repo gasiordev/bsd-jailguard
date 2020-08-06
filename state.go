@@ -18,10 +18,10 @@ type State struct {
 	Iteration   int             `json:"iteration"`
 	History     []*HistoryEntry `json:"history"`
 
-	Bases             map[string]*Base             `json:"bases"`
-	Jails             map[string]*Jail             `json:"jails"`
-	NetworkInterfaces map[string]*NetworkInterface `json:"network_interfaces"`
-	PFRules           map[string]*PFRules          `json:"pf_rules"`
+	Bases   map[string]*Base    `json:"bases"`
+	Jails   map[string]*Jail    `json:"jails"`
+	Netifs  map[string]*Netif   `json:"network_interfaces"`
+	PFRules map[string]*PFRules `json:"pf_rules"`
 
 	Filepath string `json:"filepath"`
 
@@ -92,6 +92,29 @@ func (st *State) GetJail(jl string) (*Jail, error) {
 	return st.Jails[jl], nil
 }
 
+func (st *State) GetNetif(jl string) (*Netif, error) {
+	st.logger(LOGDBG, fmt.Sprintf("Getting netif %s from the state...", jl))
+	if st.Netifs == nil {
+		st.logger(LOGDBG, "There no netifs in the state")
+		return nil, nil
+	}
+	if st.Netifs[jl] == nil {
+		// If there's a "null" in the state file (so just empty netif name key), we remove it
+		for _, k := range reflect.ValueOf(st.Netifs).MapKeys() {
+			if k.String() == jl {
+				st.RemoveItem("netif", jl)
+				st.logger(LOGDBG, fmt.Sprintf("Fixing netif %s being null in the state", jl))
+				_ = st.Save()
+			}
+		}
+
+		st.logger(LOGDBG, fmt.Sprintf("Netif %s has not been found in the state", jl))
+		return nil, nil
+	}
+	st.logger(LOGDBG, fmt.Sprintf("Netif %s has been found in the state", jl))
+	return st.Netifs[jl], nil
+}
+
 func (st *State) AddBase(rls string, bs *Base) {
 	st.logger(LOGDBG, fmt.Sprintf("Adding base %s to the state...", rls))
 	if st.Bases == nil {
@@ -110,6 +133,16 @@ func (st *State) AddJail(n string, jl *Jail) {
 	st.Jails[n] = jl
 
 	st.AddHistoryEntry(fmt.Sprintf("Add jail %s", n))
+}
+
+func (st *State) AddNetif(n string, ni *Netif) {
+	st.logger(LOGDBG, fmt.Sprintf("Adding netif %s to the state...", n))
+	if st.Netifs == nil {
+		st.Netifs = make(map[string]*Netif)
+	}
+	st.Netifs[n] = ni
+
+	st.AddHistoryEntry(fmt.Sprintf("Add netif %s", n))
 }
 
 func (st *State) RemoveItem(t string, n string) error {
@@ -134,14 +167,14 @@ func (st *State) RemoveItem(t string, n string) error {
 			}
 		}
 		st.Jails = m
-	} else if t == "network_interface" {
-		m := make(map[string]*NetworkInterface)
-		for k, _ := range st.NetworkInterfaces {
+	} else if t == "netif" {
+		m := make(map[string]*Netif)
+		for k, _ := range st.Netifs {
 			if k != n {
-				m[k] = st.NetworkInterfaces[k]
+				m[k] = st.Netifs[k]
 			}
 		}
-		st.NetworkInterfaces = m
+		st.Netifs = m
 	} else if t == "pf_rule" {
 		m := make(map[string]*PFRules)
 		for k, _ := range st.PFRules {
@@ -177,14 +210,29 @@ func (st *State) PrintItems(f *os.File, t string) error {
 			fmt.Fprintf(f, "jail %s %s\n", k, jl.State)
 		}
 	}
-	if t == "" || t == "networkinterfaces" {
-		for k, _ := range st.NetworkInterfaces {
+	if t == "" || t == "netifs" {
+		for k, _ := range st.Netifs {
 			fmt.Fprintf(f, "netif %s\n", k)
 		}
 	}
 	if t == "" || t == "pfrules" {
 		for k, _ := range st.PFRules {
 			fmt.Fprintf(f, "pfrule %s\n", k)
+		}
+	}
+	return nil
+}
+
+func (st *State) PrintItemItems(f *os.File, t string, n string, k string) error {
+	st.logger(LOGDBG, "Printing out state items...")
+	if t == "netif" && n != "" && k == "aliases" {
+		if st.Netifs[n] == nil {
+			return nil
+		}
+		if st.Netifs[n].Aliases != nil {
+			for _, v := range st.Netifs[n].Aliases {
+				fmt.Fprintf(f, "netif %s alias %s\n", n, v)
+			}
 		}
 	}
 	return nil
@@ -207,8 +255,8 @@ func (st *State) Save() error {
 	if st.Jails == nil {
 		st.Jails = make(map[string]*Jail)
 	}
-	if st.NetworkInterfaces == nil {
-		st.NetworkInterfaces = make(map[string]*NetworkInterface)
+	if st.Netifs == nil {
+		st.Netifs = make(map[string]*Netif)
 	}
 	if st.PFRules == nil {
 		st.PFRules = make(map[string]*PFRules)

@@ -45,7 +45,7 @@ func (jd *JailDir) Remove() error {
 		}
 	}
 
-	err1 := CmdRun("chflags", "-R", "noschg", jd.Dirpath)
+	err1 := CmdRun(jd.logger, "chflags", "-R", "noschg", jd.Dirpath)
 	err2 := RemoveAllWithLog(jd.Dirpath, jd.logger)
 	if err1 != nil || err2 != nil {
 		return errors.New("Error has occurred while removing jail directory. Please remove the directories manually and remove the state")

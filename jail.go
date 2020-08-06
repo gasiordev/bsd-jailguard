@@ -35,7 +35,7 @@ func (jl *Jail) AddHistoryEntry(s string) {
 
 func (jl *Jail) existsInOS() (bool, error) {
 	jl.logger(LOGDBG, fmt.Sprintf("Running 'jls' to check if jail %s is running...", jl.Name))
-	out, err := CmdOut("jls", "-Nn")
+	out, err := CmdOut(jl.logger, "jls", "-Nn")
 	if err != nil {
 		return false, errors.New("Error has occurred when checking if jail is running: " + err.Error())
 	}
@@ -54,7 +54,7 @@ func (jl *Jail) SetDefaultValues() {
 
 func (jl *Jail) Start() error {
 	jl.logger(LOGDBG, fmt.Sprintf("Running 'jail -c -f %s' command to start jail...", jl.Config.Filepath))
-	err := CmdRun("jail", "-c", "-f", jl.Config.Filepath)
+	err := CmdRun(jl.logger, "jail", "-c", "-f", jl.Config.Filepath)
 	if err != nil {
 		jl.State = "error_starting"
 		return errors.New(fmt.Sprintf("Error executing 'jail' command: %s", err.Error()))
@@ -69,7 +69,7 @@ func (jl *Jail) Start() error {
 
 func (jl *Jail) Stop() error {
 	jl.logger(LOGDBG, fmt.Sprintf("Running 'jail -r %s' command to stop jail", jl.Name))
-	err := CmdRun("jail", "-r", jl.Name)
+	err := CmdRun(jl.logger, "jail", "-r", jl.Name)
 	if err != nil {
 		jl.State = "error_stopping"
 		return errors.New(fmt.Sprintf("Error executing 'jail' command: %s", err.Error()))
