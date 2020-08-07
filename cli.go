@@ -322,6 +322,25 @@ func (j *Jailguard) getCLINetifAliasListHandler() func(*cli.CLI) int {
 	return fn
 }
 
+func (j *Jailguard) getCLIPFAnchorCheckHandler() func(*cli.CLI) int {
+	fn := func(c *cli.CLI) int {
+		if c.Flag("debug") == "true" {
+			j.Debug = true
+		}
+		if c.Flag("quiet") == "true" {
+			j.Quiet = true
+		}
+
+		err := j.CheckPFAnchor()
+		if err != nil {
+			j.Log(LOGERR, err.Error())
+			return 2
+		}
+		return 0
+	}
+	return fn
+}
+
 func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	c := cli.NewCLI("Jailguard", "Create and manage jails in FreeBSD", "Mikolaj Gasior")
 
@@ -408,8 +427,9 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	netif_alias_list := c.AddCmd("netif_alias_list", "List network interface alias IP addresses", j.getCLINetifAliasListHandler())
 	netif_alias_list.AddArg("name", "NAME", "", cli.TypeString|cli.Required)
 
-	// pf_anchor_create : name
-	// pf_anchor_remove : name
+	pf_anchor_check := c.AddCmd("pf_anchor_check", "Check if required PF anchors exist", j.getCLIPFAnchorCheckHandler())
+	pf_anchor_check.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	pf_anchor_check.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
 	// jail_portfwd_create : name host_port jail_port
 	// jail_portfwd_remove : name [-a] host_port jail_port ---> -a removes all

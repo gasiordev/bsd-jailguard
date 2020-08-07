@@ -24,6 +24,7 @@ const DIRCONFIGS = "configs"
 const DIRTMP = "tmp"
 const FILESTATE = "jailguard.jailstate"
 const NETIF = "1337"
+const PFANCHOR = "jailguard"
 
 const LOGINF = 1
 const LOGERR = -1
@@ -121,6 +122,14 @@ func (j *Jailguard) getNewNetif(n string, ip_begin string, ip_end string, if_nam
 		j.Log(t, s)
 	})
 	return ni
+}
+
+func (j *Jailguard) getNewPFAnchor(n string) *PFAnchor {
+	a := NewPFAnchor(n)
+	a.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+	return a
 }
 
 func (j *Jailguard) getJailConf(f string) (*JailConf, error) {
@@ -267,6 +276,8 @@ func (j *Jailguard) ImportStateItem(t string, n string) error {
 			return err
 		}
 		st.AddJail(n, jl)
+		// netif
+		// pf anchor
 	} else {
 		return errors.New("Invalid item type")
 	}
@@ -689,6 +700,36 @@ func (j *Jailguard) ListNetifAliases(n string) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (j *Jailguard) CheckPFAnchor() error {
+	a := j.getNewPFAnchor(PFANCHOR)
+	a.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
+	ex_nat, ex_rdr, ex, err := a.Exists()
+	if err != nil {
+		return errors.New("Error occurred while checking if pf anchors exist")
+	}
+
+	if !ex_nat {
+		j.Log(LOGINF, fmt.Sprintf("nat-anchor \"%s/*\" is missing", PFANCHOR))
+	}
+	if !ex_rdr {
+		j.Log(LOGINF, fmt.Sprintf("rdr-anchor \"%s/*\" is missing", PFANCHOR))
+	}
+	if !ex {
+		j.Log(LOGINF, fmt.Sprintf("anchor \"%s/*\" is missing", PFANCHOR))
+	}
+
+	if !ex_nat || !ex_rdr || !ex {
+		a.PrintHelp()
+		return errors.New("Required anchors are missing")
+	} else {
+		j.Log(LOGINF, "All required anchors exist")
+	}
+
 	return nil
 }
 
