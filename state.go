@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 )
 
 type State struct {
@@ -21,6 +22,9 @@ type State struct {
 	Bases  map[string]*Base  `json:"bases"`
 	Jails  map[string]*Jail  `json:"jails"`
 	Netifs map[string]*Netif `json:"network_interfaces"`
+
+	JailPortFwds  map[string]*JailPortFwd `json:"jail_port_fwds"`
+	JailNATPasses map[string]*JailNATPass `json:"jail_nat_passes"`
 
 	Filepath string `json:"filepath"`
 
@@ -39,28 +43,12 @@ func (st *State) SetDefaultValues() {
 
 func (st *State) AddHistoryEntry(s string) {
 	he := NewHistoryEntry(GetCurrentDateTime(), s)
-	if st.History == nil {
-		st.History = []*HistoryEntry{}
-	}
 	st.History = append(st.History, he)
 }
 
 func (st *State) GetBase(rls string) (*Base, error) {
 	st.logger(LOGDBG, fmt.Sprintf("Getting base %s from the state...", rls))
-	if st.Bases == nil {
-		st.logger(LOGDBG, "There are not any bases in the state")
-		return nil, nil
-	}
 	if st.Bases[rls] == nil {
-		// If there's a "null" in the state file (so just empty base name key), we remove it
-		for _, k := range reflect.ValueOf(st.Bases).MapKeys() {
-			if k.String() == rls {
-				st.RemoveItem("base", rls)
-				st.logger(LOGDBG, fmt.Sprintf("Fixing base %s being null in the state", rls))
-				_ = st.Save()
-			}
-		}
-
 		st.logger(LOGDBG, fmt.Sprintf("Base %s has not been found in the state", rls))
 		return nil, nil
 	}
@@ -70,20 +58,7 @@ func (st *State) GetBase(rls string) (*Base, error) {
 
 func (st *State) GetJail(jl string) (*Jail, error) {
 	st.logger(LOGDBG, fmt.Sprintf("Getting jail %s from the state...", jl))
-	if st.Jails == nil {
-		st.logger(LOGDBG, "There are not any jails in the state")
-		return nil, nil
-	}
 	if st.Jails[jl] == nil {
-		// If there's a "null" in the state file (so just empty jail name key), we remove it
-		for _, k := range reflect.ValueOf(st.Jails).MapKeys() {
-			if k.String() == jl {
-				st.RemoveItem("jail", jl)
-				st.logger(LOGDBG, fmt.Sprintf("Fixing jail %s being null in the state", jl))
-				_ = st.Save()
-			}
-		}
-
 		st.logger(LOGDBG, fmt.Sprintf("Jail %s has not been found in the state", jl))
 		return nil, nil
 	}
@@ -93,20 +68,7 @@ func (st *State) GetJail(jl string) (*Jail, error) {
 
 func (st *State) GetNetif(ni string) (*Netif, error) {
 	st.logger(LOGDBG, fmt.Sprintf("Getting netif %s from the state...", ni))
-	if st.Netifs == nil {
-		st.logger(LOGDBG, "There are not any netifs in the state")
-		return nil, nil
-	}
 	if st.Netifs[ni] == nil {
-		// If there's a "null" in the state file (so just empty netif name key), we remove it
-		for _, k := range reflect.ValueOf(st.Netifs).MapKeys() {
-			if k.String() == ni {
-				st.RemoveItem("netif", ni)
-				st.logger(LOGDBG, fmt.Sprintf("Fixing netif %s being null in the state", ni))
-				_ = st.Save()
-			}
-		}
-
 		st.logger(LOGDBG, fmt.Sprintf("Netif %s has not been found in the state", ni))
 		return nil, nil
 	}
@@ -114,34 +76,80 @@ func (st *State) GetNetif(ni string) (*Netif, error) {
 	return st.Netifs[ni], nil
 }
 
+func (st *State) GetJailPortFwd(n string) *JailPortFwd {
+	st.logger(LOGDBG, fmt.Sprintf("Getting port fwd %s from the state...", n))
+	if st.JailPortFwds[n] == nil {
+		st.logger(LOGDBG, fmt.Sprintf("Jail port fwd %s has not been found in the state", n))
+		return nil
+	}
+	st.logger(LOGDBG, fmt.Sprintf("Jail port fwd %s has been found in the state", n))
+	return st.JailPortFwds[n]
+}
+
+func (st *State) GetJailNATPass(n string) *JailNATPass {
+	st.logger(LOGDBG, fmt.Sprintf("Getting jail nat pass for jail %s from the state...", n))
+
+	if st.JailNATPasses[n] == nil {
+		st.logger(LOGDBG, fmt.Sprintf("Jail nat pass for jail %s has not been found in the state", n))
+		return nil
+	}
+	st.logger(LOGDBG, fmt.Sprintf("NAT pass for jail %s has been found in the state", n))
+	return st.JailNATPasses[n]
+}
+
+func (st *State) IsJailPortFwdPrefixExists(prfx string) bool {
+	st.logger(LOGDBG, fmt.Sprintf("Checking if jail port fwd prefixed %s exists in the state file...", prfx))
+	re := regexp.MustCompile("^" + prfx)
+	for _, k := range reflect.ValueOf(st.JailPortFwds).MapKeys() {
+		if re.Match([]byte(string(k.String()))) {
+			st.logger(LOGDBG, fmt.Sprintf("Jail port fwd %s has been found in the state file", k.String()))
+			return true
+		}
+	}
+	st.logger(LOGDBG, fmt.Sprintf("No jail port fwds prefixed %s have been found in the state file...", prfx))
+	return false
+}
+
+func (st *State) GetJailPortFwdsFilterJail(dst_jail string) map[string]*JailPortFwd {
+	st.logger(LOGDBG, fmt.Sprintf("Getting jail port fwds with dst jail of %s...", dst_jail))
+	m := make(map[string]*JailPortFwd)
+	for k, v := range st.JailPortFwds {
+		if v.DstJail == dst_jail {
+			st.logger(LOGDBG, fmt.Sprintf("Found jail port fwd %s", k))
+			m[k] = v
+		}
+	}
+	return m
+}
+
 func (st *State) AddBase(rls string, bs *Base) {
 	st.logger(LOGDBG, fmt.Sprintf("Adding base %s to the state...", rls))
-	if st.Bases == nil {
-		st.Bases = make(map[string]*Base)
-	}
 	st.Bases[rls] = bs
-
 	st.AddHistoryEntry(fmt.Sprintf("Add base %s", rls))
 }
 
 func (st *State) AddJail(n string, jl *Jail) {
 	st.logger(LOGDBG, fmt.Sprintf("Adding jail %s to the state...", n))
-	if st.Jails == nil {
-		st.Jails = make(map[string]*Jail)
-	}
 	st.Jails[n] = jl
-
 	st.AddHistoryEntry(fmt.Sprintf("Add jail %s", n))
 }
 
 func (st *State) AddNetif(n string, ni *Netif) {
 	st.logger(LOGDBG, fmt.Sprintf("Adding netif %s to the state...", n))
-	if st.Netifs == nil {
-		st.Netifs = make(map[string]*Netif)
-	}
 	st.Netifs[n] = ni
-
 	st.AddHistoryEntry(fmt.Sprintf("Add netif %s", n))
+}
+
+func (st *State) AddJailPortFwd(n string, fwd *JailPortFwd) {
+	st.logger(LOGDBG, fmt.Sprintf("Adding jail port fwd from interface %s port %s to jail %s port %s to the state...", fwd.SrcIf, fwd.SrcPort, fwd.DstJail, fwd.DstPort))
+	st.JailPortFwds[n] = fwd
+	st.AddHistoryEntry(fmt.Sprintf("Add jailportfwd %s", n))
+}
+
+func (st *State) AddJailNATPass(n string, np *JailNATPass) {
+	st.logger(LOGDBG, fmt.Sprintf("Adding nat pass for jail %s to the state...", n))
+	st.JailNATPasses[n] = np
+	st.AddHistoryEntry(fmt.Sprintf("Add nat pass for jail %s", n))
 }
 
 func (st *State) RemoveItem(t string, n string) error {
@@ -151,29 +159,15 @@ func (st *State) RemoveItem(t string, n string) error {
 
 	st.logger(LOGDBG, fmt.Sprintf("Removing item %s %s from the state...", t, n))
 	if t == "base" {
-		m := make(map[string]*Base)
-		for k, _ := range st.Bases {
-			if k != n {
-				m[k] = st.Bases[k]
-			}
-		}
-		st.Bases = m
+		st.Bases[n] = nil
 	} else if t == "jail" {
-		m := make(map[string]*Jail)
-		for k, _ := range st.Jails {
-			if k != n {
-				m[k] = st.Jails[k]
-			}
-		}
-		st.Jails = m
+		st.Jails[n] = nil
 	} else if t == "netif" {
-		m := make(map[string]*Netif)
-		for k, _ := range st.Netifs {
-			if k != n {
-				m[k] = st.Netifs[k]
-			}
-		}
-		st.Netifs = m
+		st.Netifs[n] = nil
+	} else if t == "jailportfwd" {
+		st.JailPortFwds[n] = nil
+	} else if t == "jailnatpass" {
+		st.JailNATPasses[n] = nil
 	} else {
 		return errors.New("Invalid state item type")
 	}
@@ -206,7 +200,31 @@ func (st *State) PrintItems(f *os.File, t string) error {
 			fmt.Fprintf(f, "netif %s\n", k)
 		}
 	}
+	if t == "" || t == "jailportfwds" {
+		for _, v := range st.JailPortFwds {
+			fmt.Fprintf(f, "jailportfwd srcif %s srcport %s dstjail %s dstport %s\n", v.SrcIf, v.SrcPort, v.DstJail, v.DstPort)
+		}
+	}
+	if t == "" || t == "jailnatpasses" {
+		for _, v := range st.JailNATPasses {
+			fmt.Fprintf(f, "jailnatpass jail %s gwif %s\n", v.JailName, v.GwIf)
+		}
+	}
 	return nil
+}
+
+func (st *State) PrintJailPortFwds(f *os.File, n string) {
+	for _, v := range st.JailPortFwds {
+		if v.DstJail == n {
+			fmt.Fprintf(f, "jailportfwd srcif %s srcport %s dstjail %s dstport %s\n", v.SrcIf, v.SrcPort, v.DstJail, v.DstPort)
+		}
+	}
+}
+
+func (st *State) PrintJailNATPass(f *os.File, n string) {
+	if st.JailNATPasses[n] != nil {
+		fmt.Fprintf(f, "jailnatpass jail %s gwif %s\n", st.JailNATPasses[n].JailName, st.JailNATPasses[n].GwIf)
+	}
 }
 
 func (st *State) PrintItemItems(f *os.File, t string, n string, k string) error {
@@ -224,16 +242,9 @@ func (st *State) PrintItemItems(f *os.File, t string, n string, k string) error 
 	return nil
 }
 
-func (st *State) Save() error {
-	st.logger(LOGDBG, "Preparing the state to be saved into the file...")
-	st.SetDefaultValues()
-	st.LastUpdated = GetCurrentDateTime()
-	if st.Created == "" {
-		st.Created = st.LastUpdated
-	}
-
-	if st.Created == "" {
-		st.Created = st.LastUpdated
+func (st *State) removeNilFields() {
+	if st.History == nil {
+		st.History = []*HistoryEntry{}
 	}
 	if st.Bases == nil {
 		st.Bases = make(map[string]*Base)
@@ -244,6 +255,78 @@ func (st *State) Save() error {
 	if st.Netifs == nil {
 		st.Netifs = make(map[string]*Netif)
 	}
+	if st.JailPortFwds == nil {
+		st.JailPortFwds = make(map[string]*JailPortFwd)
+	}
+	if st.JailNATPasses == nil {
+		st.JailNATPasses = make(map[string]*JailNATPass)
+	}
+}
+
+func (st *State) removeNilItemsBase() {
+	m := make(map[string]*Base)
+	for _, k := range reflect.ValueOf(st.Bases).MapKeys() {
+		if st.Bases[k.String()] != nil {
+			m[k.String()] = st.Bases[k.String()]
+		}
+	}
+	st.Bases = m
+}
+func (st *State) removeNilItemsJail() {
+	m := make(map[string]*Jail)
+	for _, k := range reflect.ValueOf(st.Jails).MapKeys() {
+		if st.Jails[k.String()] != nil {
+			m[k.String()] = st.Jails[k.String()]
+		}
+	}
+	st.Jails = m
+}
+func (st *State) removeNilItemsNetif() {
+	m := make(map[string]*Netif)
+	for _, k := range reflect.ValueOf(st.Netifs).MapKeys() {
+		if st.Netifs[k.String()] != nil {
+			m[k.String()] = st.Netifs[k.String()]
+		}
+	}
+	st.Netifs = m
+}
+func (st *State) removeNilItemsJailPortFwd() {
+	m := make(map[string]*JailPortFwd)
+	for _, k := range reflect.ValueOf(st.JailPortFwds).MapKeys() {
+		if st.JailPortFwds[k.String()] != nil {
+			m[k.String()] = st.JailPortFwds[k.String()]
+		}
+	}
+	st.JailPortFwds = m
+}
+func (st *State) removeNilItemsJailNATPass() {
+	m := make(map[string]*JailNATPass)
+	for _, k := range reflect.ValueOf(st.JailNATPasses).MapKeys() {
+		if st.JailNATPasses[k.String()] != nil {
+			m[k.String()] = st.JailNATPasses[k.String()]
+		}
+	}
+	st.JailNATPasses = m
+}
+
+func (st *State) removeNilItems() {
+	st.removeNilItemsBase()
+	st.removeNilItemsJail()
+	st.removeNilItemsNetif()
+	st.removeNilItemsJailPortFwd()
+	st.removeNilItemsJailNATPass()
+}
+
+func (st *State) Save() error {
+	st.logger(LOGDBG, "Preparing the state to be saved into the file...")
+	st.SetDefaultValues()
+	st.LastUpdated = GetCurrentDateTime()
+	if st.Created == "" {
+		st.Created = st.LastUpdated
+	}
+
+	st.removeNilFields()
+	st.removeNilItems()
 
 	st.logger(LOGDBG, "Generating state JSON...")
 	o, err := json.Marshal(st)
@@ -302,6 +385,9 @@ func NewState(f string) (*State, error) {
 	if err != nil {
 		return nil, errors.New("Error has occurred while parsing state file: " + err.Error())
 	}
+
+	st.removeNilFields()
+	st.removeNilItems()
 
 	return st, nil
 }

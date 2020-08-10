@@ -4,20 +4,23 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	// "path/filepath"
 	"regexp"
 )
 
 type Jail struct {
-	Release     string          `json:"release"`
-	SourceURL   string          `json:"source_url"`
-	Name        string          `json:"name"`
-	Created     string          `json:"created"`
-	LastUpdated string          `json:"last_updated"`
-	Config      *JailConf       `json:"config"`
-	Dir         *JailDir        `json:"dir"`
-	Iteration   int             `json:"iteration"`
-	History     []*HistoryEntry `json:"history"`
-	State       string          `json:"state"`
+	Release     string            `json:"release"`
+	SourceURL   string            `json:"source_url"`
+	Name        string            `json:"name"`
+	Created     string            `json:"created"`
+	LastUpdated string            `json:"last_updated"`
+	Config      *JailConf         `json:"config"`
+	Dir         *JailDir          `json:"dir"`
+	Iteration   int               `json:"iteration"`
+	History     []*HistoryEntry   `json:"history"`
+	State       string            `json:"state"`
+	PortFwds    map[string]string `json:"port_fwds"`
+	NATPass     string            `json:"nat_pass"`
 	logger      func(int, string)
 }
 
@@ -126,6 +129,47 @@ func (jl *Jail) Import() error {
 	}
 
 	jl.logger(LOGDBG, "Jail source directory and config exist and jail can be imported")
+	return nil
+}
+
+func (jl *Jail) AddPortFwd(host_port string, jail_port string) error {
+	if jl.PortFwds == nil {
+		jl.PortFwds = make(map[string]string)
+	}
+	for k, v := range jl.PortFwds {
+		if k == host_port {
+			if v == jail_port {
+				return nil
+			} else {
+				return errors.New(fmt.Sprintf("Host port %s is already mapped", host_port))
+			}
+		}
+	}
+	jl.PortFwds[host_port] = jail_port
+	return nil
+}
+
+func (jl *Jail) DeletePortFwd(host_port string, jail_port string) error {
+	if jl.PortFwds == nil {
+		jl.PortFwds = make(map[string]string)
+	}
+	m := make(map[string]string)
+	for k, v := range jl.PortFwds {
+		if k != host_port || v != jail_port {
+			m[k] = v
+		}
+	}
+	jl.PortFwds = m
+	return nil
+}
+
+func (jl *Jail) CreateNATPass(if_gw string) error {
+	jl.NATPass = if_gw
+	return nil
+}
+
+func (jl *Jail) RemoveNATPass() error {
+	jl.NATPass = ""
 	return nil
 }
 
