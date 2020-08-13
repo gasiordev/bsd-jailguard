@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 type Netif struct {
@@ -149,9 +150,37 @@ func (ni *Netif) AddAlias(ip string) (string, error) {
 	if ni.Aliases == nil {
 		ni.Aliases = []string{}
 	}
-	for _, v := range ni.Aliases {
-		if v == ip {
-			return ip, nil
+
+	if ip == "" {
+		// Find free IP address within a range defined in the network interface
+		ip_b := strings.Split(ni.IPAddrBegin, ".")
+		ip_e := strings.Split(ni.IPAddrEnd, ".")
+		num_b, _ := strconv.Atoi(ip_b[3])
+		num_e, _ := strconv.Atoi(ip_e[3])
+		found := 0
+		for i:=num_b; i<=num_e; i++ {
+			taken := false
+			for _, v := range ni.Aliases {
+				i_ip := fmt.Sprintf("%s.%s.%s.%s", ip_b[0], ip_b[1], ip_b[2], strconv.Itoa(i))
+				if v == i_ip {
+					taken = true
+					break
+				}
+			}
+			if !taken {
+				found = i
+				break
+			}
+		}
+		if found == 0 {
+			return "", errors.New("Error has occurred whilst finding a free IP address")
+		}
+		ip = fmt.Sprintf("%s.%s.%s.%s", ip_b[0], ip_b[1], ip_b[2], strconv.Itoa(found))
+	} else {
+		for _, v := range ni.Aliases {
+			if v == ip {
+				return ip, nil
+			}
 		}
 	}
 
