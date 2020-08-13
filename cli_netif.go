@@ -162,12 +162,21 @@ func (j *Jailguard) AddNetifCmds(c *cli.CLI) {
 
 	alias_add := c.AddCmd("netif_alias_add", "Add alias IP address to a network interface", j.getCLINetifAliasAddHandler())
 	alias_add.AddArg("name", "NAME", "", cli.TypeAlphanumeric|cli.AllowUnderscore|cli.AllowHyphen|cli.Required)
-	alias_add.AddArg("ip_addr", "IP_ADDR", "", cli.TypeString|cli.Required)
+	alias_add.AddArg("ip_addr", "IPv4_ADDR", "", cli.TypeString|cli.Required)
 
 	alias_delete := c.AddCmd("netif_alias_delete", "Delete alias IP address from a network interface", j.getCLINetifAliasDeleteHandler())
 	alias_delete.AddArg("name", "NAME", "", cli.TypeAlphanumeric|cli.AllowUnderscore|cli.AllowHyphen|cli.Required)
-	alias_delete.AddArg("ip_addr", "IP_ADDR", "", cli.TypeString|cli.Required)
+	alias_delete.AddArg("ip_addr", "IPv4_ADDR", "", cli.TypeString|cli.Required)
 
 	alias_list := c.AddCmd("netif_alias_list", "List network interface alias IP addresses", j.getCLINetifAliasListHandler())
 	alias_list.AddArg("name", "NAME", "", cli.TypeAlphanumeric|cli.AllowUnderscore|cli.AllowHyphen|cli.Required)
+
+	fn2 := func(c *cli.CLI) error {
+		if !IsValidIPAddress(c.Arg("ip_addr")) {
+			return errors.New("Argument IPv4_ADDR has invalid value")
+		}
+		return nil
+	}
+	alias_add.AddPostValidation(fn2)
+	alias_delete.AddPostValidation(fn2)
 }
