@@ -1,7 +1,9 @@
 package main
 
 import (
-	"github.com/gasiordev/go-cli"
+	"errors"
+	"github.com/nicholasgasior/go-cli"
+	"regexp"
 )
 
 func (j *Jailguard) getCLIBaseDownloadHandler() func(*cli.CLI) int {
@@ -64,13 +66,20 @@ func (j *Jailguard) AddBaseCmds(c *cli.CLI) {
 	// TODO: Change 'release' flag to TypeAlphanumeric once AllowHyphen gets implemented in go-cli
 	base_download.AddArg("release", "RELEASE", "", cli.TypeString|cli.Required)
 	base_download.AddFlag("overwrite", "w", "", "Overwrite if exists", cli.TypeBool)
-	base_download.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	base_download.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
 
 	_ = c.AddCmd("base_list", "List FreeBSD bases", j.getCLIBaseListHandler())
 
 	base_remove := c.AddCmd("base_remove", "Removes FreeBSD base", j.getCLIBaseRemoveHandler())
-	base_remove.AddArg("release", "RELEASE", "", cli.TypeString|cli.Required)
-	base_remove.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	base_remove.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	base_remove.AddArg("release", "RELEASE", "", cli.TypeAlphanumeric|cli.AllowHyphen|cli.AllowUnderscore|cli.AllowDots|cli.Required)
+
+	// Add release validation
+	rls_download := func(c *cli.CLI) error {
+		re := regexp.MustCompile(`^[12][0-9]\.[0-9]{1,2}\-RELEASE$`)
+		m := re.Match([]byte(c.Arg("release")))
+		if !m {
+			return errors.New("Argument RELEASE has invalid value")
+		}
+		return nil
+	}
+	base_download.AddPostValidation(rls_download)
 }

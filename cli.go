@@ -3,7 +3,7 @@ package main
 import (
 	// "errors"
 	"fmt"
-	"github.com/gasiordev/go-cli"
+	"github.com/nicholasgasior/go-cli"
 	"os"
 )
 
@@ -16,7 +16,7 @@ func getCLIVersionHandler(j *Jailguard) func(*cli.CLI) int {
 }
 
 func NewJailguardCLI(j *Jailguard) *cli.CLI {
-	c := cli.NewCLI("Jailguard", "Create and manage jails in FreeBSD", "Mikolaj Gasior")
+	c := cli.NewCLI("Jailguard", "Create and manage jails in FreeBSD", "Nicholas Gasior")
 
 	j.AddStateCmds(c)
 	j.AddBaseCmds(c)
@@ -25,6 +25,9 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	j.AddPFAnchorCmds(c)
 	j.AddJailPortFwdCmds(c)
 	j.AddJailNATPassCmds(c)
+
+	c.AddFlagToCmds("quiet", "q", "", "Do not output anything", cli.TypeBool)
+	c.AddFlagToCmds("debug", "d", "", "Print more information", cli.TypeBool)
 
 	// TODO
 	// - get free ip address from interface begin-end range when ip address is not passed

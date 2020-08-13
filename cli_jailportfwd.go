@@ -1,7 +1,8 @@
 package main
 
 import (
-	"github.com/gasiordev/go-cli"
+	"errors"
+	"github.com/nicholasgasior/go-cli"
 )
 
 func (j *Jailguard) getCLIJailPortFwdAddHandler() func(*cli.CLI) int {
@@ -81,29 +82,32 @@ func (j *Jailguard) getCLIJailPortFwdListHandler() func(*cli.CLI) int {
 }
 
 func (j *Jailguard) AddJailPortFwdCmds(c *cli.CLI) {
-	jail_portfwd_add := c.AddCmd("jail_portfwd_add", "Add port forwarding from host to jail", j.getCLIJailPortFwdAddHandler())
-	jail_portfwd_add.AddArg("src_if", "SOURCE_INTERFACE", "", cli.TypeString|cli.Required)
-	jail_portfwd_add.AddArg("src_port", "SOURCE_PORT", "", cli.TypeString|cli.Required)
-	jail_portfwd_add.AddArg("dst_jail", "DESTINATION_JAIL", "", cli.TypeString|cli.Required)
-	jail_portfwd_add.AddArg("dst_port", "DESTINATION_PORT", "", cli.TypeString|cli.Required)
-	jail_portfwd_add.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	jail_portfwd_add.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	add := c.AddCmd("jail_portfwd_add", "Add port forwarding from host to jail", j.getCLIJailPortFwdAddHandler())
+	add.AddArg("src_if", "SOURCE_INTERFACE", "", cli.TypeString|cli.Required)
+	add.AddArg("src_port", "SOURCE_PORT", "", cli.TypeString|cli.Required)
+	add.AddArg("dst_jail", "DESTINATION_JAIL", "", cli.TypeString|cli.Required)
+	add.AddArg("dst_port", "DESTINATION_PORT", "", cli.TypeString|cli.Required)
 
-	jail_portfwd_delete := c.AddCmd("jail_portfwd_delete", "Delete port forwarding", j.getCLIJailPortFwdDeleteHandler())
-	jail_portfwd_delete.AddArg("src_if", "SOURCE_INTERFACE", "", cli.TypeString|cli.Required)
-	jail_portfwd_delete.AddArg("src_port", "SOURCE_PORT", "", cli.TypeString|cli.Required)
-	jail_portfwd_delete.AddArg("dst_jail", "DESTINATION_JAIL", "", cli.TypeString|cli.Required)
-	jail_portfwd_delete.AddArg("dst_port", "DESTINATION_PORT", "", cli.TypeString|cli.Required)
-	jail_portfwd_delete.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	jail_portfwd_delete.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	delete := c.AddCmd("jail_portfwd_delete", "Delete port forwarding", j.getCLIJailPortFwdDeleteHandler())
+	delete.AddArg("src_if", "SOURCE_INTERFACE", "", cli.TypeString|cli.Required)
+	delete.AddArg("src_port", "SOURCE_PORT", "", cli.TypeString|cli.Required)
+	delete.AddArg("dst_jail", "DESTINATION_JAIL", "", cli.TypeString|cli.Required)
+	delete.AddArg("dst_port", "DESTINATION_PORT", "", cli.TypeString|cli.Required)
 
-	jail_portfwd_delete_all := c.AddCmd("jail_portfwd_delete_all", "Delete all port forwarding for jail", j.getCLIJailPortFwdDeleteAllHandler())
-	jail_portfwd_delete_all.AddArg("dst_jail", "DESTINATION_JAIL", "", cli.TypeString|cli.Required)
-	jail_portfwd_delete_all.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	jail_portfwd_delete_all.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	delete_all := c.AddCmd("jail_portfwd_delete_all", "Delete all port forwarding for jail", j.getCLIJailPortFwdDeleteAllHandler())
+	delete_all.AddArg("dst_jail", "DESTINATION_JAIL", "", cli.TypeString|cli.Required)
 
-	jail_portfwd_list := c.AddCmd("jail_portfwd_list", "List port forwarding from host to jail", j.getCLIJailPortFwdListHandler())
-	jail_portfwd_list.AddArg("dst_jail", "DESTINATION_JAIL", "", cli.TypeString|cli.Required)
-	jail_portfwd_list.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	jail_portfwd_list.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	list := c.AddCmd("jail_portfwd_list", "List port forwarding from host to jail", j.getCLIJailPortFwdListHandler())
+	list.AddArg("dst_jail", "DESTINATION_JAIL", "", cli.TypeString|cli.Required)
+
+	fn := func(c *cli.CLI) error {
+		if !IsValidJailName(c.Arg("dst_jail")) {
+			return errors.New("Argument DESTINATION_JAIL is not a valid jail name")
+		}
+		return nil
+	}
+	add.AddPostValidation(fn)
+	delete.AddPostValidation(fn)
+	delete_all.AddPostValidation(fn)
+	list.AddPostValidation(fn)
 }

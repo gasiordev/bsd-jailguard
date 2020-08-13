@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/gasiordev/go-cli"
+	"github.com/nicholasgasior/go-cli"
 	"log"
 	"os"
 )

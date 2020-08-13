@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gasiordev/go-cli"
+	"github.com/nicholasgasior/go-cli"
 )
 
 func (j *Jailguard) getCLIStateListHandler() func(*cli.CLI) int {
@@ -56,15 +56,11 @@ func (j *Jailguard) getCLIStateImportHandler() func(*cli.CLI) int {
 func (j *Jailguard) AddStateCmds(c *cli.CLI) {
 	_ = c.AddCmd("state_list", "Lists saved state items", j.getCLIStateListHandler())
 
-	state_remove := c.AddCmd("state_remove", "Remove item from state", j.getCLIStateRemoveHandler())
-	state_remove.AddArg("item_type", "TYPE", "", cli.TypeString|cli.Required)
-	state_remove.AddArg("item_name", "NAME", "", cli.TypeString|cli.Required)
-	state_remove.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	state_remove.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	st_remove := c.AddCmd("state_remove", "Remove item from state", j.getCLIStateRemoveHandler())
+	st_remove.AddArg("item_type", "TYPE", "", cli.TypeAlphanumeric|cli.AllowUnderscore|cli.AllowHyphen|cli.Required)
+	st_remove.AddArg("item_name", "NAME", "", cli.TypeAlphanumeric|cli.AllowUnderscore|cli.AllowHyphen|cli.Required)
 
-	state_import := c.AddCmd("state_import", "Import item to state", j.getCLIStateImportHandler())
-	state_import.AddArg("item_type", "TYPE", "", cli.TypeString|cli.Required)
-	state_import.AddArg("item_name", "NAME", "", cli.TypeAlphanumeric|cli.Required)
-	state_import.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	state_import.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	st_import := c.AddCmd("state_import", "Import item to state", j.getCLIStateImportHandler())
+	st_import.AddArg("item_type", "TYPE", "", cli.TypeAlphanumeric|cli.AllowUnderscore|cli.AllowHyphen|cli.Required)
+	st_import.AddArg("item_name", "NAME", "", cli.TypeAlphanumeric|cli.AllowUnderscore|cli.AllowHyphen|cli.Required)
 }

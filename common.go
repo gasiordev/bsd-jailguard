@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -101,6 +102,35 @@ func JailExistsInOSWithLog(n string, fn func(int, string)) (bool, error) {
 
 	fn(LOGDBG, fmt.Sprintf("Jail %s does not seem to be running", n))
 	return false, nil
+}
+
+func IsValidJailName(n string) bool {
+	// TODO: 'jail' man page doesn't say too much about name restrictions.
+	// Needs checking elsewhere
+	re := regexp.MustCompile(`^[a-z][a-z0-9_\-]{1,31}$`)
+	if !re.Match([]byte(n)) {
+		return false
+	}
+	if strings.Contains(n, "--") {
+		return false
+	}
+	return true
+}
+
+func IsValidIPAddress(ip string) bool {
+	re := regexp.MustCompile(`^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$`)
+	if !re.Match([]byte(ip)) {
+		return false
+	}
+
+	ip_b := strings.Split(ip, ".")
+	for i := 0; i < 4; i++ {
+		v, _ := strconv.Atoi(ip_b[i])
+		if (i == 0 && (v < 1 || v > 255)) || (i > 0 && (v < 0 || v > 255)) {
+			return false
+		}
+	}
+	return true
 }
 
 func GetCurrentDateTime() string {

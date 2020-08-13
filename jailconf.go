@@ -42,11 +42,6 @@ func (jc *JailConf) SetDefaultValues() {
 	jc.Iteration = 1
 }
 
-func (jc *JailConf) isValidName(s string) bool {
-	var r = regexp.MustCompile(`^[a-z]+[a-z0-9_-]*$`)
-	return r.MatchString(s)
-}
-
 func (jc *JailConf) isValidKey(s string) bool {
 	var r = regexp.MustCompile(`^[a-z]+[a-z0-9_]*$`)
 	return r.MatchString(s)
@@ -82,7 +77,7 @@ func (jc *JailConf) ParseFile(f string) error {
 	var i int
 	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
 		if i == 0 {
-			if !jc.isValidName(s.TokenText()) {
+			if !IsValidJailName(s.TokenText()) {
 				return errors.New("Invalid jail name")
 			}
 			jc.Name = s.TokenText()

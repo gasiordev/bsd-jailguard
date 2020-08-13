@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gasiordev/go-cli"
+	"github.com/nicholasgasior/go-cli"
 )
 
 func (j *Jailguard) getCLIPFAnchorCheckHandler() func(*cli.CLI) int {
@@ -24,7 +24,5 @@ func (j *Jailguard) getCLIPFAnchorCheckHandler() func(*cli.CLI) int {
 }
 
 func (j *Jailguard) AddPFAnchorCmds(c *cli.CLI) {
-	pf_anchor_check := c.AddCmd("pf_anchor_check", "Check if required PF anchors exist", j.getCLIPFAnchorCheckHandler())
-	pf_anchor_check.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	pf_anchor_check.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	_ = c.AddCmd("pf_anchor_check", "Check if required PF anchors exist", j.getCLIPFAnchorCheckHandler())
 }

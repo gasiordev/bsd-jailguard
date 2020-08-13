@@ -1,7 +1,8 @@
 package main
 
 import (
-	"github.com/gasiordev/go-cli"
+	"errors"
+	"github.com/nicholasgasior/go-cli"
 )
 
 func (j *Jailguard) getCLIJailNATPassCreateHandler() func(*cli.CLI) int {
@@ -62,18 +63,23 @@ func (j *Jailguard) getCLIJailNATPassShowHandler() func(*cli.CLI) int {
 }
 
 func (j *Jailguard) AddJailNATPassCmds(c *cli.CLI) {
-	jail_natpass_create := c.AddCmd("jail_natpass_create", "Create NAT pass for jail", j.getCLIJailNATPassCreateHandler())
-	jail_natpass_create.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
-	jail_natpass_create.AddArg("gw_if", "GATEWAY_INTERFACE", "", cli.TypeString|cli.Required)
-	jail_natpass_create.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	jail_natpass_create.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	create := c.AddCmd("jail_natpass_create", "Create NAT pass for jail", j.getCLIJailNATPassCreateHandler())
+	create.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
+	create.AddArg("gw_if", "GATEWAY_INTERFACE", "", cli.TypeString|cli.Required)
 
-	jail_natpass_remove := c.AddCmd("jail_natpass_remove", "Remove NAT pass from jail", j.getCLIJailNATPassRemoveHandler())
-	jail_natpass_remove.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
-	jail_natpass_remove.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	jail_natpass_remove.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	remove := c.AddCmd("jail_natpass_remove", "Remove NAT pass from jail", j.getCLIJailNATPassRemoveHandler())
+	remove.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
 
-	jail_natpass_show := c.AddCmd("jail_natpass_show", "Show NAT pass gateway for jail", j.getCLIJailNATPassShowHandler())
-	jail_natpass_show.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
-	jail_natpass_show.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	show := c.AddCmd("jail_natpass_show", "Show NAT pass gateway for jail", j.getCLIJailNATPassShowHandler())
+	show.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
+
+	fn := func(c *cli.CLI) error {
+		if !IsValidJailName(c.Arg("jail")) {
+			return errors.New("Argument JAIL is not a valid jail name")
+		}
+		return nil
+	}
+	create.AddPostValidation(fn)
+	remove.AddPostValidation(fn)
+	show.AddPostValidation(fn)
 }

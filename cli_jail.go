@@ -1,7 +1,8 @@
 package main
 
 import (
-	"github.com/gasiordev/go-cli"
+	"errors"
+	"github.com/nicholasgasior/go-cli"
 )
 
 func (j *Jailguard) getCLIJailListHandler() func(*cli.CLI) int {
@@ -101,28 +102,31 @@ func (j *Jailguard) getCLIJailStartHandler() func(*cli.CLI) int {
 }
 
 func (j *Jailguard) AddJailCmds(c *cli.CLI) {
-	jail_create := c.AddCmd("jail_create", "Create jail source", j.getCLIJailCreateHandler())
-	jail_create.AddArg("file", "FILE.JAIL", "", cli.TypePathFile|cli.MustExist|cli.Required)
-	jail_create.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	jail_create.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
-	jail_create.AddFlag("base", "b", "", "Base to use", cli.TypeString)
-	jail_create.AddFlag("start", "s", "", "Start jail after creating", cli.TypeBool)
+	create := c.AddCmd("jail_create", "Create jail source", j.getCLIJailCreateHandler())
+	create.AddArg("file", "FILE.JAIL", "", cli.TypePathFile|cli.MustExist|cli.Required)
+	create.AddFlag("base", "b", "", "Base to use", cli.TypeAlphanumeric|cli.AllowDots|cli.AllowUnderscore|cli.AllowHyphen)
+	create.AddFlag("start", "s", "", "Start jail after creating", cli.TypeBool)
 
-	jail_remove := c.AddCmd("jail_remove", "Remove jail source", j.getCLIJailRemoveHandler())
-	jail_remove.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
-	jail_remove.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	jail_remove.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
-	jail_remove.AddFlag("stop", "s", "", "Stop if running", cli.TypeBool)
+	remove := c.AddCmd("jail_remove", "Remove jail source", j.getCLIJailRemoveHandler())
+	remove.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
+	remove.AddFlag("stop", "s", "", "Stop if running", cli.TypeBool)
 
-	jail_stop := c.AddCmd("jail_stop", "Stop jail", j.getCLIJailStopHandler())
-	jail_stop.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
-	jail_stop.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	jail_stop.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	stop := c.AddCmd("jail_stop", "Stop jail", j.getCLIJailStopHandler())
+	stop.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
 
-	jail_start := c.AddCmd("jail_start", "Start jail", j.getCLIJailStartHandler())
-	jail_start.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
-	jail_start.AddFlag("quiet", "q", "", "Do not output anything", cli.TypeBool)
-	jail_start.AddFlag("debug", "d", "", "Print more information", cli.TypeBool)
+	start := c.AddCmd("jail_start", "Start jail", j.getCLIJailStartHandler())
+	start.AddArg("jail", "JAIL", "", cli.TypeString|cli.Required)
+
+	fn := func(c *cli.CLI) error {
+		if !IsValidJailName(c.Arg("jail")) {
+			return errors.New("Argument JAIL is not a valid jail name")
+		}
+		return nil
+	}
+	create.AddPostValidation(fn)
+	remove.AddPostValidation(fn)
+	stop.AddPostValidation(fn)
+	start.AddPostValidation(fn)
 
 	_ = c.AddCmd("jail_list", "List jails", j.getCLIJailListHandler())
 }
