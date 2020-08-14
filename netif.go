@@ -158,7 +158,7 @@ func (ni *Netif) AddAlias(ip string) (string, error) {
 		num_b, _ := strconv.Atoi(ip_b[3])
 		num_e, _ := strconv.Atoi(ip_e[3])
 		found := 0
-		for i:=num_b; i<=num_e; i++ {
+		for i := num_b; i <= num_e; i++ {
 			taken := false
 			for _, v := range ni.Aliases {
 				i_ip := fmt.Sprintf("%s.%s.%s.%s", ip_b[0], ip_b[1], ip_b[2], strconv.Itoa(i))

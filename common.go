@@ -136,3 +136,17 @@ func IsValidIPAddress(ip string) bool {
 func GetCurrentDateTime() string {
 	return time.Now().String()
 }
+
+func IsSysCtlIsEnabled(fn func(int, string), n string) (bool, error) {
+	fn(LOGDBG, fmt.Sprintf("Checking for %s sysctl...", n))
+	out, err := CmdOut(fn, "sysctl", n)
+	if err != nil {
+		return false, err
+	}
+
+	re := regexp.MustCompile(n + ": 1")
+	if !re.Match([]byte(string(out))) {
+		return false, nil
+	}
+	return true, nil
+}
