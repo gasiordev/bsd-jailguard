@@ -44,6 +44,9 @@ func (j *Jailguard) Run() {
 	c := NewJailguardCLI(j)
 	j.cli = c
 	cfg, err := NewConfig(DIRCONFIG)
+	cfg.SetLogger(func(t int, s string) {
+		j.Log(t, s)
+	})
 	if err != nil {
 		fmt.Fprintf(j.cli.GetStderr(), err.Error())
 		os.Exit(1)

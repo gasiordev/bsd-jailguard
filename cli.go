@@ -25,6 +25,7 @@ func NewJailguardCLI(j *Jailguard) *cli.CLI {
 	j.AddPFAnchorCmds(c)
 	j.AddJailPortFwdCmds(c)
 	j.AddJailNATPassCmds(c)
+	j.AddConfigCmds(c)
 
 	c.AddFlagToCmds("quiet", "q", "", "Do not output anything", cli.TypeBool)
 	c.AddFlagToCmds("debug", "d", "", "Print more information", cli.TypeBool)
