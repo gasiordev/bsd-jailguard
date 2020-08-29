@@ -103,7 +103,7 @@ func (j *Jailguard) getCLIJailStartHandler() func(*cli.CLI) int {
 
 func (j *Jailguard) AddJailCmds(c *cli.CLI) {
 	create := c.AddCmd("jail_create", "Create jail source", j.getCLIJailCreateHandler())
-	create.AddArg("file", "FILE.JAIL", "", cli.TypePathFile|cli.MustExist|cli.Required)
+	create.AddArg("file", "JAIL_CONF_FILE", "", cli.TypePathFile|cli.MustExist|cli.Required)
 	create.AddFlag("base", "b", "", "Base to use", cli.TypeAlphanumeric|cli.AllowDots|cli.AllowUnderscore|cli.AllowHyphen)
 	create.AddFlag("start", "s", "", "Start jail after creating", cli.TypeBool)
 
@@ -123,7 +123,6 @@ func (j *Jailguard) AddJailCmds(c *cli.CLI) {
 		}
 		return nil
 	}
-	create.AddPostValidation(fn)
 	remove.AddPostValidation(fn)
 	stop.AddPostValidation(fn)
 	start.AddPostValidation(fn)

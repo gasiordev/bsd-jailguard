@@ -1,4 +1,0 @@
-dupajail {
-  interface = lo1;
-  ip4.addr = 192.168.22.100;
-}
