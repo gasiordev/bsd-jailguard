@@ -11,3 +11,5 @@ FreeBSD jail management tool
 * use 'log'? + make logs go to a logfile
 * templates/images
 * validation when setting config values
+* absolute paths in config
+* 'jailguard' as default interface name
