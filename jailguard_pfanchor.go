@@ -14,7 +14,8 @@ func (j *Jailguard) getNewPFAnchor(n string) *PFAnchor {
 }
 
 func (j *Jailguard) CheckPFAnchor(hide bool) error {
-	a := j.getNewPFAnchor(PFANCHOR)
+	c := j.GetConfig()
+	a := j.getNewPFAnchor(c.PfAnchor)
 	a.SetLogger(func(t int, s string) {
 		j.Log(t, s)
 	})
@@ -24,13 +25,13 @@ func (j *Jailguard) CheckPFAnchor(hide bool) error {
 	}
 
 	if !ex_nat {
-		j.Log(LOGINF, fmt.Sprintf("nat-anchor \"%s/*\" is missing", PFANCHOR))
+		j.Log(LOGINF, fmt.Sprintf("nat-anchor \"%s/*\" is missing", c.PfAnchor))
 	}
 	if !ex_rdr {
-		j.Log(LOGINF, fmt.Sprintf("rdr-anchor \"%s/*\" is missing", PFANCHOR))
+		j.Log(LOGINF, fmt.Sprintf("rdr-anchor \"%s/*\" is missing", c.PfAnchor))
 	}
 	if !ex {
-		j.Log(LOGINF, fmt.Sprintf("anchor \"%s/*\" is missing", PFANCHOR))
+		j.Log(LOGINF, fmt.Sprintf("anchor \"%s/*\" is missing", c.PfAnchor))
 	}
 
 	if !ex_nat || !ex_rdr || !ex {

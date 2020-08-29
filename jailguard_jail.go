@@ -8,11 +8,13 @@ import (
 )
 
 func (j *Jailguard) getJailDirPath(jl string) string {
-	return PATHDATA + "/" + DIRJAILS + "/" + jl
+	c := j.GetConfig()
+	return c.PathData + "/" + c.DirJails + "/" + jl
 }
 
 func (j *Jailguard) getConfigFilePath(jl string) string {
-	return PATHDATA + "/" + DIRCONFIGS + "/" + jl + ".jail"
+	c := j.GetConfig()
+	return c.PathData + "/" + c.DirConfigs + "/" + jl + ".jail"
 }
 
 func (j *Jailguard) getNewJail(cfg *JailConf, dir *JailDir) *Jail {

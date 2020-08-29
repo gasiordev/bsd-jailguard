@@ -8,7 +8,8 @@ import (
 )
 
 func (j *Jailguard) getJailPFRulesFilePath(jl string) string {
-	return PATHDATA + "/" + DIRCONFIGS + "/" + jl + ".pf"
+	c := j.GetConfig()
+	return c.PathData + "/" + c.DirConfigs + "/" + jl + ".pf"
 }
 
 func (j *Jailguard) FlushJailPFRulesFromState(jl *Jail, st *State) error {
@@ -73,7 +74,8 @@ func (j *Jailguard) FlushJailPFRulesFromFile(n string) error {
 		return errors.New("Error has occurred while flusing jail pf rules from file. It seems file is actually directory. Fix it manually please")
 	}
 
-	err = CmdRun(j.Log, "pfctl", "-a", PFANCHOR+"/"+n, "-f", j.getJailPFRulesFilePath(n))
+	c := j.GetConfig()
+	err = CmdRun(j.Log, "pfctl", "-a", c.PfAnchor+"/"+n, "-f", j.getJailPFRulesFilePath(n))
 	if err != nil {
 		return errors.New("Error has occurred while flushing jail pf rules from file")
 	}

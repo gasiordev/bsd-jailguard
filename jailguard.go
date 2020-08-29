@@ -8,16 +8,7 @@ import (
 	"os"
 )
 
-const PATHDATA = "/usr/local/jailguard"
-const DIRBASES = "bases"
-const DIRTEMPLATES = "templates"
-const DIRSTATE = "state"
-const DIRJAILS = "jails"
-const DIRCONFIGS = "configs"
-const DIRTMP = "tmp"
-const FILESTATE = "jailguard.jailstate"
-const NETIF = "1337"
-const PFANCHOR = "jailguard"
+const DIRCONFIG = "/usr/local/etc/jailguard.conf.json"
 
 const LOGINF = 1
 const LOGERR = -1
@@ -25,6 +16,7 @@ const LOGDBG = 2
 
 type Jailguard struct {
 	cli    *cli.CLI
+	config *Config
 	logBuf bytes.Buffer
 	logger *log.Logger
 	Quiet  bool
@@ -33,6 +25,10 @@ type Jailguard struct {
 
 func (j *Jailguard) GetCLI() *cli.CLI {
 	return j.cli
+}
+
+func (j *Jailguard) GetConfig() *Config {
+	return j.config
 }
 
 func (j *Jailguard) GetLogBuf() *bytes.Buffer {
@@ -47,6 +43,13 @@ func (j *Jailguard) Run() {
 	j.initLogger()
 	c := NewJailguardCLI(j)
 	j.cli = c
+	cfg, err := NewConfig(DIRCONFIG)
+	if err != nil {
+		fmt.Fprintf(j.cli.GetStderr(), err.Error())
+		os.Exit(1)
+	}
+	j.config = cfg
+	// TODO: Validate config
 	os.Exit(c.Run(os.Stdout, os.Stderr))
 }
 

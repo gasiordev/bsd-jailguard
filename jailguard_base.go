@@ -5,7 +5,8 @@ import (
 )
 
 func (j *Jailguard) getBaseDirPath(rls string) string {
-	return PATHDATA + "/" + DIRBASES + "/" + rls
+	c := j.GetConfig()
+	return c.PathData + "/" + c.DirBases + "/" + rls
 }
 
 func (j *Jailguard) getNewBase(rls string) *Base {

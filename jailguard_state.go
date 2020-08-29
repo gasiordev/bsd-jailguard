@@ -6,7 +6,8 @@ import (
 )
 
 func (j *Jailguard) getStateFilePath() string {
-	return PATHDATA + "/" + DIRSTATE + "/" + FILESTATE
+	c := j.GetConfig()
+	return c.PathData + "/" + c.DirState + "/" + c.FileState
 }
 
 func (j *Jailguard) getState() (*State, error) {
