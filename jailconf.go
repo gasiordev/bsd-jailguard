@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -8,7 +9,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"text/scanner"
 )
 
 const CHAR_END_KEYVAL = ";"
@@ -24,6 +24,11 @@ type JailConf struct {
 	History   []*HistoryEntry   `json:"history"`
 
 	logger func(int, string)
+}
+
+type JailConfJSON struct {
+	Version string            `json:"version"`
+	Jail    map[string]string `json:"jail"`
 }
 
 func (jc *JailConf) SetLogger(f func(int, string)) {
@@ -51,91 +56,26 @@ func (jc *JailConf) isKeyValValid(k string, v string) error {
 	return nil
 }
 
-func (jc *JailConf) getScanner(f string) (*scanner.Scanner, error) {
-	c, err := ioutil.ReadFile(f)
-	if err != nil {
-		return nil, err
-	}
-
-	var s scanner.Scanner
-	s.Init(strings.NewReader(string(c)))
-	return &s, nil
-}
-
 func (jc *JailConf) ParseFile(f string) error {
 	jc.logger(LOGDBG, fmt.Sprintf("Opening %s to parse...", f))
-	s, err := jc.getScanner(f)
+	c, err := ioutil.ReadFile(f)
 	if err != nil {
 		return err
 	}
 
-	k := ""
-	v := ""
-	gotKey := false
-	prevToken := ""
-
-	var i int
-	for tok := s.Scan(); tok != scanner.EOF; tok = s.Scan() {
-		if i == 0 {
-			if !IsValidJailName(s.TokenText()) {
-				return errors.New("Invalid jail name")
-			}
-			jc.Name = s.TokenText()
-		}
-		if i == 1 && s.TokenText() != CHAR_BEGIN_BLK {
-			return errors.New("Missing opening curl bracket")
-		}
-		if i > 1 {
-			if !gotKey {
-				if s.TokenText() == CHAR_END_BLK {
-					if k == "" {
-						break
-					} else {
-						return errors.New("Key not closed or its value missing")
-					}
-				}
-
-				if !jc.isValidKey(s.TokenText()) && s.TokenText() != "." && s.TokenText() != CHAR_BEGIN_VAL && s.TokenText() != CHAR_END_KEYVAL {
-					return errors.New("Invalid key (1)")
-				}
-				if k == "" && (s.TokenText() == "." || s.TokenText() == CHAR_BEGIN_VAL || s.TokenText() == CHAR_END_KEYVAL) {
-					return errors.New("Invalid key (2)")
-				}
-				if prevToken == "." && (s.TokenText() == CHAR_BEGIN_VAL || s.TokenText() == CHAR_END_KEYVAL) {
-					return errors.New("Invalid key (3)")
-				}
-				if s.TokenText() == CHAR_BEGIN_VAL {
-					gotKey = true
-				} else if s.TokenText() == CHAR_END_KEYVAL {
-					gotKey = false
-					v = "true"
-					jc.Config[k] = v
-					k = ""
-					v = ""
-				} else {
-					k = k + s.TokenText()
-				}
-			} else {
-				if s.TokenText() == CHAR_END_KEYVAL && v == "" {
-					return errors.New("Invalid value")
-				}
-				if s.TokenText() == CHAR_END_KEYVAL {
-					gotKey = false
-					// TODO: Replacing double quote needs a better implementation
-					v = strings.Trim(v, "\"")
-					jc.Config[k] = v
-					k = ""
-					v = ""
-				} else {
-					v = v + s.TokenText()
-				}
-			}
-		}
-		prevToken = s.TokenText()
-		i++
+	v := &JailConfJSON{}
+	err = json.Unmarshal(c, &v)
+	if err != nil {
+		return errors.New(fmt.Sprintf("Error has occurred while unmarshaling file: %s", err.Error()))
 	}
-	jc.logger(LOGDBG, fmt.Sprintf("File %s has been successfully parsed", f))
 
+	if v.Jail["name"] == "" {
+		return errors.New("Jail name is missing from the jail file")
+	}
+	jc.Name = v.Jail["name"]
+	jc.Config = v.Jail
+
+	jc.logger(LOGDBG, fmt.Sprintf("File %s has been successfully parsed", f))
 	return nil
 }
 
@@ -194,7 +134,6 @@ func (jc *JailConf) Write(p string) error {
 	}
 
 	jc.Iteration++
-
 	o := jc.Name + " {\n"
 	for k, v := range jc.Config {
 		if v == "true" {
