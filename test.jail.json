@@ -5,6 +5,9 @@
     "interface": "lo1",
     "ip4.addr": "192.168.20.21",
     "allow.raw_sockets": "true",
-    "mount.devfs": "true"
+    "mount.devfs": "true",
+    "guard.create:interface",
+    "guard.create:ip4.addr",
+    "guard.from_file:exec.prestart:./test.jail.prestart.sh",
   }
 }
