@@ -3,7 +3,6 @@ FreeBSD jail management tool
 
 ## TODO
 
-* validation for at least some config values
 * 'guard.create:interface', 'guard.create:ip4.addr', 'guard.from_file:$key:$filepath'
 * 'state_check'
 * 'state_fix' (both ways)

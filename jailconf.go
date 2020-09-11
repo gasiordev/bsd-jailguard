@@ -110,6 +110,19 @@ func (jc *JailConf) Validate() error {
 		}
 	}
 
+	keys := []string{"allow.raw_sockets", "mount.devfs"}
+	for _, k := range keys {
+		if jc.Config[k] != "" {
+			if jc.Config[k] != "true" || jc.Config[k] != "false" {
+				return errors.New(fmt.Sprintf("%s should be 'true' or 'false'", k))
+			}
+		}
+	}
+
+	if jc.Config["ip4.addr"] != "" && !IsValidIPAddress(jc.Config["ip4.addr"]) {
+		return errors.New(fmt.Sprintf("ip4.addr has invalid value"))
+	}
+
 	return nil
 }
 
