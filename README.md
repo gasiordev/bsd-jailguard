@@ -3,7 +3,7 @@ FreeBSD jail management tool
 
 ## TODO
 
-* 'guard.create:interface', 'guard.create:ip4.addr', 'guard.from_file:$key:$filepath'
+* jail_sshuser_add, jail_sshuser_remove
 * 'state_check'
 * 'state_fix' (both ways)
 * restructure code into subdirectories
